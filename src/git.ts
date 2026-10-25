@@ -4,7 +4,7 @@ import { OperationalError } from './errors.js';
 
 export async function git(cwd: string, args: readonly string[], allowed = [0]): Promise<Buffer> {
   return new Promise((accept, reject) => {
-    execFile('git', ['--no-replace-objects', ...args], {
+    execFile('git', ['--no-replace-objects', '--no-lazy-fetch', ...args], {
       cwd, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 30_000,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_NO_LAZY_FETCH: '1' },
       windowsHide: true,

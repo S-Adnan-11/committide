@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
@@ -13,6 +13,11 @@ const scratch = mkdtempSync(join(tmpdir(), 'committide-package-'));
 function execute(binary, args, cwd, expected = 0, input = '') {
   const result = spawnSync(binary, args, {
     cwd, input, encoding: 'utf8', timeout: 120_000,
+    env: {
+      ...process.env,
+      PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? process.env.Path ?? ''}`,
+      GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(scratch, 'absent-global-config'),
+    },
     // These cmd arguments below are fixed strings, with their quoting already supplied.
     windowsVerbatimArguments: process.platform === 'win32' && /(?:^|[\\/])cmd\.exe$/i.test(binary),
   });
@@ -50,7 +55,7 @@ try {
   const destination = join(scratch, 'fresh consumer with spaces');
   mkdirSync(destination);
   writeFileSync(join(destination, 'package.json'), '{"name":"package-smoke-test","private":true}');
-  npm(['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--package-lock=false', archive], destination);
+  npm(['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', archive], destination);
   const manifest = JSON.parse(readFileSync(join(destination, 'node_modules', 'committide', 'package.json'), 'utf8'));
   assert.equal(manifest.bin.committide, 'dist/cli.js');
   const installedCli = join(destination, 'node_modules', 'committide', manifest.bin.committide);
@@ -70,6 +75,16 @@ try {
   assert.equal(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination).stdout, 'Checked 1; failed 0; skipped 0.\n');
   makeCommit('malformed history');
   assert.match(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination, 1).stderr, /header-format/);
+  execute(process.execPath, [installedCli, 'hooks', 'install'], destination);
+  const head = execute('git', ['rev-parse', 'HEAD'], destination).stdout;
+  const actualCommit = message => [
+    '-c', 'commit.gpgsign=false', '-c', 'user.name=Fixture',
+    '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', message,
+  ];
+  execute('git', actualCommit('malformed hook message'), destination, 1);
+  assert.equal(execute('git', ['rev-parse', 'HEAD'], destination).stdout, head);
+  execute('git', actualCommit('feat: installed hook'), destination);
+  execute(process.execPath, [installedCli, 'hooks', 'uninstall'], destination);
   // Exercise npm's actual platform executable shim with fixed commands.
   if (process.platform === 'win32') {
     for (const [command, code] of [
@@ -85,7 +100,7 @@ try {
     execute(shim, ['lint', '--message', 'feat: installed shim'], destination);
     execute(shim, ['lint', '--message', 'invalid'], destination, 1);
   }
-  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
+  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
   console.log(`Archive: ${packed.filename}; integrity: ${packed.integrity}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });

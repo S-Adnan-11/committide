@@ -5,6 +5,8 @@ import { loadConfig } from './config.js';
 import { OperationalError } from './errors.js';
 import { lintMessage } from './message.js';
 import { checkHistory } from './history.js';
+import { localDependency, manageHook } from './hooks.js';
+import { repository } from './git.js';
 
 interface LintOptions { message?: string; file?: string }
 
@@ -74,6 +76,34 @@ program.command('check')
     }
     process.stdout.write(`${result.checked ? '' : 'Empty range. ' }Checked ${result.checked}; failed ${result.failed}; skipped ${result.skipped}.\n`);
     process.exitCode = result.failed ? 1 : 0;
+  });
+
+const hooks = program.command('hooks').description('Explicitly install or remove a repository-local commit-msg hook');
+for (const action of ['install', 'uninstall'] as const) {
+  hooks.command(action).action(async (_options: unknown, command: Command) => {
+    if (command.optsWithGlobals<{ config?: string }>().config !== undefined) {
+      throw new OperationalError('hook-config', 'Installed hooks discover configuration from the consuming repository root. Configure that file or integrate the hook manually with --config.');
+    }
+    process.stdout.write(`${await manageHook(process.cwd(), action)}\n`);
+  });
+}
+
+program.command('hook', { hidden: true })
+  .description('Validate a commit-msg hook input without changing it')
+  .requiredOption('--file <path>', 'proposed UTF-8 message file')
+  .action(async (options: { file: string }, command: Command) => {
+    const repo = await repository(process.cwd());
+    await localDependency(repo.root);
+    const allowedTypes = await loadConfig(repo.root, command.optsWithGlobals<{ config?: string }>().config);
+    let message: string;
+    try { message = await readFile(options.file, 'utf8'); } catch {
+      throw new OperationalError('input-file', 'Cannot read the proposed commit-message file. Check its path and permissions.');
+    }
+    const result = lintMessage(message, allowedTypes);
+    for (const diagnostic of result.diagnostics) {
+      process.stderr.write(`error [${diagnostic.rule}] line ${diagnostic.line}: ${diagnostic.message}\n`);
+    }
+    if (result.diagnostics.length) process.exitCode = 1;
   });
 
 process.once('SIGINT', () => { process.exit(130); });

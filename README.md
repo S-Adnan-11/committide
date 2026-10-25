@@ -157,6 +157,9 @@ history first, for example with `git fetch --unshallow`. The command itself neve
 fetches, changes refs, checks out files, or edits the index/worktree/configuration.
 Git replacement objects are ignored, and partial-clone lazy fetching is disabled.
 Non-UTF-8 history is an operational error rather than silently recoded text.
+Git integration has been verified with Git 2.56.0. A Git installation supporting
+`--no-lazy-fetch`, `--path-format`, and `--end-of-options` is required; unsupported
+options produce an operational error rather than permitting an implicit fetch.
 
 Configuration uses the current working directory and `--config` precedence above;
 configuration from historical commits is never executed or loaded automatically.
@@ -185,6 +188,80 @@ A CI step after checkout and `npm ci`/`npm run build` can reuse the command:
 Use this fragment in a pull-request workflow; both SHAs must be locally available.
 It is a usage example, not a claim that hosted CI or another OS has been tested.
 
+## Commit-message hooks
+
+First install a reviewed CommitTide tarball or version as a dependency of the
+consuming repository root, committing its npm lockfile with that project:
+
+```sh
+npm install --save-dev --save-exact /path/to/committide-0.1.0.tgz
+node node_modules/committide/dist/cli.js hooks install
+node node_modules/committide/dist/cli.js hooks uninstall
+```
+
+Installation is explicit; npm installation never installs a hook. The installer
+does not create a Node project or change package files, Git configuration, or
+existing hooks. It requires root package.json/package-lock.json to declare the
+same dependency selection and the installed package version to match the lock.
+Linked packages, workspaces, and other lockfile formats need manual integration.
+
+The generated shell hook invokes the root's real compiled local executable with
+Git's message-file argument. It requires Node >=22.12.0 on PATH and a matching
+installed dependency/lockfile at commit time. Missing runtime/dependency, invalid
+configuration, or a lint error rejects the commit. No package download, AI request,
+message rewrite, index change, or commit is performed by CommitTide. A failed
+commit leaves your changes available for correction and retry.
+
+Installation/removal use Git's effective hook location, including linked
+worktrees and commands launched below the root. Default common hooks apply to
+all worktrees of that repository; each worktree needs its own local dependency.
+Locally configured relative or absolute hooks paths in a direct child directory
+of the working-tree root are supported (as is the default hooks directory).
+Nested repository layouts require manual integration. Inherited/global paths,
+external/shared directories, symlinks/junctions,
+bare repositories, and recognized managed paths such as `.husky` are refused
+with manual integration guidance. Hook and package paths must be real local paths.
+
+Existing hooks are preserved byte for byte. Ownership requires the complete
+unchanged generated content (and executable mode on POSIX), not a marker string.
+Reinstalling an unchanged hook is a no-op; uninstall only removes an unchanged
+owned hook and is harmless when it is absent. Edited/foreign hooks require manual
+integration. Inspect the reported hook file before changing it. A lock coordinates
+installers, exclusive file creation avoids replacement, and removal verifies a
+quarantined snapshot before deletion. Concurrent external edits can require manual
+recovery; diagnostics identify preserved content. If a process is interrupted,
+inspect stale `.committide-lock` or `.committide-install-*` files before retrying.
+
+For an existing shell hook, a minimal manual integration from the repository root
+is the following. Keep its existing logic and propagate the validation failure:
+
+```sh
+node node_modules/committide/dist/cli.js lint --file "$1" || exit $?
+```
+
+Adjust the real local package path for your layout. Do not use network-downloading
+`npx` inside a hook. Manual integrations are maintained by the consuming project;
+automatic uninstall will preserve them.
+
+Hook validation uses root configuration discovery. `--config` is rejected for
+automatic installation/removal because it would not persist into future Git
+invocations; an existing manual hook can pass `--config` explicitly to lint.
+Direct lint behavior is unchanged. Hook inputs are read without changing or
+stripping Git template comments: keep a conventional header on the first line.
+
+The policy is strict and has no configurable generated-message exemptions.
+Default `Merge ...`, `Revert ...`, `fixup! ...`, `squash! ...`, and `amend! ...`
+subjects fail the common rules. Use `git merge -m "chore: merge branch"` or compose
+a conventional revert message. For temporary fixups/squashes, intentionally use
+`git commit --no-verify --fixup REF` / `--squash REF`, finish autosquashing, then
+run `check` on the finished range. In the tested Git version, `git revert --no-edit`
+bypasses commit-msg and its generated subject fails history checking. Prefer
+`git revert --no-commit REF` followed by `git commit -m "revert: describe reversal"`.
+Git operations that do not invoke commit-msg
+cannot be enforced by this hook. Local hooks are bypassable with `--no-verify`;
+run range checking in CI for an additional enforcement boundary. Passing format
+checks still does not establish whether a message accurately describes changes.
+
 ## Contributing and verification
 
 ```sh
@@ -196,7 +273,12 @@ npm run verify:package
 
 The strict TypeScript check covers production code; Node's built-in test runner
 exercises message parsing, policy, configuration boundaries, and executable
-channels and exit codes. Package verification checks actual archive bytes, installs
+channels and exit codes. Git integration tests create disposable repositories and
+pack/install the local dependency to exercise actual commits, worktrees, merge,
+revert, and autosquash behavior. They require npm registry/cache access and never
+install hooks into the source repository. See [Git's hook documentation](https://git-scm.com/docs/githooks)
+and [revision range semantics](https://git-scm.com/docs/gitrevisions) for the
+underlying Git contracts. Package verification checks actual archive bytes, installs
 the tarball in a temporary directory outside the source tree, and exercises the
 installed JavaScript and npm executable shim. It needs registry access to install
 the production dependency and removes its temporary directory afterward.
@@ -207,9 +289,9 @@ other platforms are not yet verified.
 
 | Platform | Node | Verification |
 | --- | --- | --- |
-| Windows x64 | 22.12.0 | 89 tests and installed tarball checks passed |
-| Windows x64 | 24.22.1 | 89 tests and installed tarball checks passed |
-| Windows x64 | 26.12.1 | 96 tests and installed tarball checks passed |
+| Windows x64 | 22.12.0 | 106 tests and installed tarball checks passed |
+| Windows x64 | 24.22.1 | 106 tests and installed tarball checks passed |
+| Windows x64 | 26.12.1 | 106 tests and installed tarball checks passed |
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.
