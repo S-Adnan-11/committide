@@ -538,9 +538,10 @@ simulate terminal flags for deterministic EOF/cancellation and output assertions
 they are separate from real terminal evidence. Physical keyboard Ctrl+C has not
 yet been verified.
 
-Remote adapter and integrated AI flow checks use synthetic HTTP responses; a
-live Groq request has not yet been verified. No provider credential is needed
-for the automated suite or installed-package checks.
+Groq drafting has also been exercised once with a small synthetic staged change
+through the installed CLI, including editing, validation, and accepted output.
+Automated adapter and flow tests use synthetic HTTP responses and need no provider
+credential. One live example does not establish general draft quality.
 
 Production dependency: Commander (MIT), for command routing and help.
 Development dependencies: TypeScript (Apache-2.0) and Node type definitions (MIT).
