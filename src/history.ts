@@ -1,5 +1,5 @@
 import { OperationalError } from './errors.js';
-import { git, readCommit, repository, resolveCommit } from './git.js';
+import { git, readCommit, repository, resolveCommit, requireCompleteHistory } from './git.js';
 import { lintMessage } from './message.js';
 import type { Diagnostic } from './message.js';
 
@@ -14,9 +14,7 @@ export interface HistoryResult {
 
 export async function checkHistory(cwd: string, from: string, to: string, allowedTypes: readonly string[]): Promise<HistoryResult> {
   const repo = await repository(cwd);
-  if ((await git(repo.root, ['rev-parse', '--is-shallow-repository'])).toString().trim() === 'true') {
-    throw new OperationalError('git-shallow', 'History is shallow. Fetch complete history first (for example git fetch --unshallow, or checkout with fetch-depth: 0 in CI). No fetch was performed.');
-  }
+  await requireCompleteHistory(repo.root);
   // Resolve both boundaries once; all later Git arguments use validated object IDs.
   const fromOid = await resolveCommit(repo.root, from);
   const toOid = await resolveCommit(repo.root, to);

@@ -132,7 +132,7 @@ also use stdout. Message content is not echoed in diagnostics.
 | 2 | Usage, input, configuration, or operational error |
 | 130 | Interactive interruption (Ctrl+C) |
 
-Changelog generation and writing assistance are not implemented in this version.
+Commit-writing assistance is not implemented in this version.
 No installation hook is registered.
 
 ## Check Git history
@@ -261,6 +261,60 @@ Git operations that do not invoke commit-msg
 cannot be enforced by this hook. Local hooks are bypassable with `--no-verify`;
 run range checking in CI for an additional enforcement boundary. Passing format
 checks still does not establish whether a message accurately describes changes.
+
+## Preview release notes
+
+```sh
+node dist/cli.js changelog
+node dist/cli.js changelog --from v1.0.0 --to HEAD
+node dist/cli.js changelog --include-maintenance
+```
+
+The command prints an Unreleased Markdown section to stdout. It does not create
+or change a changelog file. Boundary information, counts, and skipped-message
+diagnostics go to stderr, so redirecting stdout produces usable Markdown.
+The default target is HEAD. Explicit boundaries use the same two-dot reachability
+semantics and safe single-commit ref rules as `check`.
+
+Without `--from`, the baseline is the nearest commit on the selected target's
+first-parent chain carrying a stable [SemVer](https://semver.org/) tag, optionally
+prefixed with lowercase `v`. Lightweight and annotated tags (including nested
+annotated tags) are peeled to their commit targets. Build metadata is allowed;
+prerelease/custom/malformed tags and tags pointing to noncommits are excluded.
+Tag creation dates and version magnitude do not select the boundary. Multiple
+stable tags at that nearest commit are an error; use explicit `--from` to resolve
+the ambiguity. A tag on the target selects an empty range. With no applicable
+tag, all reachable history is included, including the root commit. First-parent
+selection determines only the boundary: relevant merged commits still appear in
+the resulting reachability difference. Shallow/missing history fails without
+fetching, and operational errors do not print partial Markdown.
+
+Groups have a stable order: Breaking Changes, Features, Fixes, Performance
+Improvements, and optional Maintenance. Within each group, commits retain Git's
+reverse topological order. A breaking commit appears once in Breaking Changes,
+with its scope, description, and multiline breaking details. Empty headings are
+omitted. There are no current timestamps or generated links.
+
+Historical syntax is parsed independently of today's type allowlist. Custom types
+with breaking information are included; other conforming custom/maintenance types
+are filtered by default and grouped as Maintenance with `--include-maintenance`.
+Current configuration discovery and `--config` are still validated consistently;
+the type allowlist does not hide historical breaking changes.
+
+Nonconforming messages are reported as skipped with commit IDs/rules/counts.
+Native nonconforming merge/revert/fixup/squash messages are skipped, not silently
+treated as valid or irrelevant. Conventional revert messages follow their type;
+there is no automatic cancellation of reverted commit pairs. An empty range or
+no qualifying entries produces `No qualifying changes.` rather than invented notes.
+Notes summarize recorded commit intent, not verified net behavior or release prose.
+
+Commit-controlled Markdown/HTML punctuation is encoded as numeric entities so
+headings, links, HTML, and generated-marker injection render as text. Unicode
+remains readable; terminal controls/bidi formatting are replaced by visible code
+point labels. Multiline breaking details retain their order. Review the output
+for semantic accuracy before sharing it. The command never fetches, stages,
+commits, tags, bumps versions, pushes, publishes, or calls an AI service.
+File updates are not yet available; the current command is a read-only preview.
 
 ## Contributing and verification
 

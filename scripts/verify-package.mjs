@@ -75,6 +75,10 @@ try {
   assert.equal(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination).stdout, 'Checked 1; failed 0; skipped 0.\n');
   makeCommit('malformed history');
   assert.match(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination, 1).stderr, /header-format/);
+  const notes = execute(process.execPath, [installedCli, 'changelog'], destination);
+  assert.match(notes.stdout, /### Fixes/);
+  assert.match(notes.stderr, /skipped 1/);
+  assert.equal(execute(process.execPath, [installedCli, 'changelog'], destination).stdout, notes.stdout);
   execute(process.execPath, [installedCli, 'hooks', 'install'], destination);
   const head = execute('git', ['rev-parse', 'HEAD'], destination).stdout;
   const actualCommit = message => [

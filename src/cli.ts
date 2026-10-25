@@ -7,6 +7,8 @@ import { lintMessage } from './message.js';
 import { checkHistory } from './history.js';
 import { localDependency, manageHook } from './hooks.js';
 import { repository } from './git.js';
+import { generateChangelog, terminalText } from './changelog.js';
+import type { ChangelogOptions } from './changelog.js';
 
 interface LintOptions { message?: string; file?: string }
 
@@ -76,6 +78,22 @@ program.command('check')
     }
     process.stdout.write(`${result.checked ? '' : 'Empty range. ' }Checked ${result.checked}; failed ${result.failed}; skipped ${result.skipped}.\n`);
     process.exitCode = result.failed ? 1 : 0;
+  });
+
+program.command('changelog')
+  .description('Preview deterministic Unreleased notes from local Git history')
+  .option('--from <ref>', 'exclude commits reachable from this explicit boundary')
+  .option('--to <ref>', 'target commit (default HEAD)')
+  .option('--include-maintenance', 'include other conforming types as maintenance')
+  .action(async (options: ChangelogOptions, command: Command) => {
+    await loadConfig(process.cwd(), command.optsWithGlobals<{ config?: string }>().config);
+    const result = await generateChangelog(process.cwd(), options);
+    process.stderr.write(`Boundary: ${result.from ?? 'all reachable history'}${result.tag ? ` (tag ${terminalText(result.tag)})` : ''}; target ${result.to}.\n`);
+    for (const skipped of result.skipped) {
+      process.stderr.write(`Skipped commit ${skipped.oid}: ${skipped.rules.map(terminalText).join('; ')}\n`);
+    }
+    process.stderr.write(`${result.selected ? '' : 'Empty range. '}Selected ${result.selected}; included ${result.included}; filtered ${result.filtered}; skipped ${result.skipped.length}.\n`);
+    process.stdout.write(result.markdown);
   });
 
 const hooks = program.command('hooks').description('Explicitly install or remove a repository-local commit-msg hook');

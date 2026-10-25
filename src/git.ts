@@ -54,6 +54,12 @@ export async function resolveCommit(cwd: string, ref: string): Promise<string> {
 
 export interface HistoryCommit { oid: string; parents: string[]; message: string }
 
+export async function requireCompleteHistory(cwd: string): Promise<void> {
+  if ((await git(cwd, ['rev-parse', '--is-shallow-repository'])).toString().trim() === 'true') {
+    throw new OperationalError('git-shallow', 'History is shallow. Fetch complete history first (for example git fetch --unshallow, or checkout with fetch-depth: 0 in CI). No fetch was performed.');
+  }
+}
+
 export async function readCommit(cwd: string, oid: string): Promise<HistoryCommit> {
   const raw = await git(cwd, ['cat-file', 'commit', oid]);
   const boundary = raw.indexOf('\n\n');
