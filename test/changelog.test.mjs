@@ -116,7 +116,7 @@ test('groups scoped Unicode/multiline/custom breaking messages once and reports 
   commit(cwd, env, 'perf: cache data');
   commit(cwd, env, 'legacy: maintenance custom');
   commit(cwd, env, 'constructor: maintenance prototype name');
-  commit(cwd, env, '__proto__: maintenance prototype token');
+  const lastConforming = commit(cwd, env, '__proto__: maintenance prototype token');
   for (const message of ['Merge branch side', 'Revert "old"', 'fixup! feat: temporary', 'squash! feat: temporary']) commit(cwd, env, message);
   const result = invoke(cwd, env, ['changelog']);
   for (const oid of [breakingFix, custom, bang]) assert.equal(result.stdout.split(oid).length - 1, 1);
@@ -132,6 +132,9 @@ test('groups scoped Unicode/multiline/custom breaking messages once and reports 
   assert.match(all.stdout, /maintenance custom/);
   assert.ok(all.stdout.indexOf('### Breaking Changes') < all.stdout.indexOf('### Features'));
   assert.ok(all.stdout.indexOf('### Features') < all.stdout.indexOf('### Performance Improvements'));
+  const onlySkipped = invoke(cwd, env, ['changelog', '--from', lastConforming]);
+  assert.match(onlySkipped.stdout, /No qualifying changes/);
+  assert.match(onlySkipped.stderr, /Selected 4; included 0; filtered 0; skipped 4/);
 });
 
 test('escapes commit Markdown, HTML, markers, links, and terminal controls while retaining Unicode', () => {
@@ -173,10 +176,17 @@ test('operational errors never produce apparently complete Markdown', () => {
   const empty = init(root, 'unborn', env);
   assert.equal(invoke(empty, env, ['changelog'], 2).stdout, '');
   assert.match(invoke(root, env, ['changelog'], 2).stderr, /git-repository/);
+  assert.match(invoke(root, { ...env, PATH: '' }, ['changelog'], 2).stderr, /git-missing/);
   const cwd = init(root, 'invalid refs', env);
-  commit(cwd, env, 'feat: base');
+  const base = commit(cwd, env, 'feat: base');
+  commit(cwd, env, 'fix: later');
   for (const ref of ['missing', '--all', 'HEAD..HEAD']) assert.equal(invoke(cwd, env, ['changelog', `--to=${ref}`], 2).stdout, '');
   const shallow = join(root, 'shallow');
   git(root, env, ['clone', '--depth=1', `file://${cwd.replace(/\\/g, '/')}`, shallow]);
   assert.match(invoke(shallow, env, ['changelog'], 2).stderr, /git-shallow/);
+  rmSync(join(cwd, '.git', 'objects', base.slice(0, 2), base.slice(2)));
+  const missing = invoke(cwd, env, ['changelog', '--write'], 2);
+  assert.match(missing.stderr, /git-operation/);
+  assert.equal(missing.stdout, '');
+  assert.equal(existsSync(join(cwd, 'CHANGELOG.md')), false);
 });

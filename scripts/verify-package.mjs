@@ -79,6 +79,12 @@ try {
   assert.match(notes.stdout, /### Fixes/);
   assert.match(notes.stderr, /skipped 1/);
   assert.equal(execute(process.execPath, [installedCli, 'changelog'], destination).stdout, notes.stdout);
+  assert.equal(execute(process.execPath, [installedCli, 'changelog', '--write'], destination).stdout, '');
+  const changelogPath = join(destination, 'CHANGELOG.md');
+  const generated = readFileSync(changelogPath, 'utf8');
+  writeFileSync(changelogPath, generated + '\n## 1.0.0\n\nHandwritten release text.\n');
+  execute(process.execPath, [installedCli, 'changelog', '--write'], destination);
+  assert.ok(readFileSync(changelogPath, 'utf8').endsWith('Handwritten release text.\n'));
   execute(process.execPath, [installedCli, 'hooks', 'install'], destination);
   const head = execute('git', ['rev-parse', 'HEAD'], destination).stdout;
   const actualCommit = message => [
@@ -104,7 +110,7 @@ try {
     execute(shim, ['lint', '--message', 'feat: installed shim'], destination);
     execute(shim, ['lint', '--message', 'invalid'], destination, 1);
   }
-  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
+  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/changelog/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
   console.log(`Archive: ${packed.filename}; integrity: ${packed.integrity}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });

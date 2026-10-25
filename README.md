@@ -262,16 +262,17 @@ cannot be enforced by this hook. Local hooks are bypassable with `--no-verify`;
 run range checking in CI for an additional enforcement boundary. Passing format
 checks still does not establish whether a message accurately describes changes.
 
-## Preview release notes
+## Release notes
 
 ```sh
 node dist/cli.js changelog
 node dist/cli.js changelog --from v1.0.0 --to HEAD
 node dist/cli.js changelog --include-maintenance
+node dist/cli.js changelog --write
 ```
 
-The command prints an Unreleased Markdown section to stdout. It does not create
-or change a changelog file. Boundary information, counts, and skipped-message
+Without `--write`, the command prints an Unreleased Markdown section to stdout
+and does not create or change any file. Boundary information, counts, and skipped-message
 diagnostics go to stderr, so redirecting stdout produces usable Markdown.
 The default target is HEAD. Explicit boundaries use the same two-dot reachability
 semantics and safe single-commit ref rules as `check`.
@@ -314,7 +315,59 @@ remains readable; terminal controls/bidi formatting are replaced by visible code
 point labels. Multiline breaking details retain their order. Review the output
 for semantic accuracy before sharing it. The command never fetches, stages,
 commits, tags, bumps versions, pushes, publishes, or calls an AI service.
-File updates are not yet available; the current command is a read-only preview.
+
+### Managed file updates
+
+`--write` explicitly creates or updates `CHANGELOG.md` at the repository root,
+including when invoked from a subdirectory. It emits status/diagnostics to stderr
+and leaves stdout empty. Writing requires a non-bare working repository. A new
+file receives a title, Unreleased heading, and one managed block:
+
+```markdown
+# Changelog
+
+## Unreleased
+
+<!-- committide:unreleased:start -->
+No qualifying changes.
+<!-- committide:unreleased:end -->
+```
+
+In an existing UTF-8 document, only bytes between those two standalone marker
+lines are replaced. Handwritten notes, marker lines, previous releases, outside
+line endings, and an optional UTF-8 BOM are preserved byte for byte. Generated
+lines follow the start marker's LF or CRLF ending. Changes inside the managed
+block are replaced on the next generation. Identical output does not rewrite the
+file or change its modification time.
+
+Existing documents require exactly one unambiguous level-two Unreleased heading
+(`## Unreleased` or a bracketed/linked Unreleased heading) and one correctly
+ordered managed block before the next level-one/two section. Missing, duplicated,
+reversed, inline, or misplaced markers/sections are refused. HTML section headings,
+decorated Unreleased headings containing comments, setext headings, and
+other ambiguous layouts require manual repair. Fenced/indented code and HTML examples
+do not establish ownership; ambiguous examples can cause refusal. To initialize
+an existing file, obtain a block with the read-only preview, review the document,
+and manually place one Unreleased heading and standalone marker pair before the
+previous releases. There is no force-overwrite option.
+
+Before history generation, the writer captures the existing file snapshot. It
+builds complete candidate bytes, coordinates other CommitTide writers with
+`CHANGELOG.md.committide-lock`, prepares/syncs a same-directory temporary file,
+then rechecks the destination. Detected edits are refused. Existing files use a
+rename replacement; new files use a non-overwriting hard-link publication so a
+newly appeared destination is preserved. Directory/symlink/junction/shared
+hard-link targets are refused. A filesystem supporting these operations is
+required. Interrupted operations can leave an owned `.committide-changelog-*.tmp`
+or lock directory; inspect those before retrying. The destination is never
+truncated in place or deleted first.
+
+Replacement atomicity and edit detection are separate: the snapshot checks and
+lock prevent competing cooperative writers from overwriting one another, but
+portable filesystem APIs do not provide compare-and-swap against an uncooperative
+external editor between the final check and rename. Review and retry a detected
+conflict. These safeguards have been exercised on Windows local storage; other
+filesystems and platforms remain unverified.
 
 ## Contributing and verification
 
@@ -336,6 +389,8 @@ underlying Git contracts. Package verification checks actual archive bytes, inst
 the tarball in a temporary directory outside the source tree, and exercises the
 installed JavaScript and npm executable shim. It needs registry access to install
 the production dependency and removes its temporary directory afterward.
+On Windows, the file-symlink fixture is skipped if the host lacks symlink creation
+privilege or Developer Mode; directory-junction and other path checks still run.
 
 Runtime requirements follow [Commander 15](https://github.com/tj/commander.js)'s
 Node 22.12.0 minimum. Actual platform/runtime verification is recorded below;
@@ -343,9 +398,9 @@ other platforms are not yet verified.
 
 | Platform | Node | Verification |
 | --- | --- | --- |
-| Windows x64 | 22.12.0 | 106 tests and installed tarball checks passed |
-| Windows x64 | 24.22.1 | 106 tests and installed tarball checks passed |
-| Windows x64 | 26.12.1 | 106 tests and installed tarball checks passed |
+| Windows x64 | 22.12.0 | 145 tests and installed tarball checks passed |
+| Windows x64 | 24.22.1 | 145 tests and installed tarball checks passed |
+| Windows x64 | 26.12.1 | 145 tests and installed tarball checks passed |
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.
