@@ -1,6 +1,44 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { OperationalError } from './errors.js';
+
+/** Drain and hash all stdout, retaining only a bounded prefix for display. */
+export async function gitPrefix(cwd: string, args: readonly string[], limit: number): Promise<{ bytes: Buffer; truncated: boolean; hash: string }> {
+  return new Promise((accept, reject) => {
+    const child = spawn('git', ['--no-replace-objects', '--no-lazy-fetch', ...args], {
+      cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_NO_LAZY_FETCH: '1', GIT_OPTIONAL_LOCKS: '0' },
+    });
+    const chunks: Buffer[] = [];
+    const hash = createHash('sha256');
+    let size = 0;
+    let truncated = false;
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 30_000);
+    child.stdout.on('data', (chunk: Buffer) => {
+      hash.update(chunk);
+      const remaining = Math.max(0, limit - size);
+      if (chunk.length > remaining) truncated = true;
+      if (remaining) chunks.push(chunk.subarray(0, remaining));
+      size += Math.min(remaining, chunk.length);
+    });
+    // Never retain patches or repository-controlled diagnostics in errors/logs.
+    child.stderr.resume();
+    child.once('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      reject(new OperationalError(error.code === 'ENOENT' ? 'git-missing' : 'git-operation',
+        error.code === 'ENOENT' ? 'Git was not found. Install Git and make it available on PATH.' : 'Cannot start staged Git inspection.'));
+    });
+    child.once('close', code => {
+      clearTimeout(timer);
+      if (code !== 0 || timedOut) reject(new OperationalError('git-operation', timedOut
+        ? 'Staged Git inspection exceeded 30 seconds. Review a smaller staged set and retry.'
+        : 'Cannot inspect staged changes. Check repository access, index conflicts, and available local objects.'));
+      else accept({ bytes: Buffer.concat(chunks), truncated, hash: hash.digest('hex') });
+    });
+  });
+}
 
 export async function git(cwd: string, args: readonly string[], allowed = [0]): Promise<Buffer> {
   return new Promise((accept, reject) => {
