@@ -61,6 +61,7 @@ try {
   assert.equal(manifest.bin.committide, 'dist/cli.js');
   const installedCli = join(destination, 'node_modules', 'committide', manifest.bin.committide);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--output/);
+  assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--ai/);
   assert.match(execute(process.execPath, [installedCli, 'suggest'], destination, 2).stderr, /suggest-terminal/);
   assert.match(execute(process.execPath, [installedCli, '--help'], destination).stdout, /lint/);
   assert.equal(execute(process.execPath, [installedCli, '--version'], destination).stdout.trim(), manifest.version);
@@ -71,6 +72,31 @@ try {
   writeFileSync(join(destination, 'staged.txt'), 'staged example\n');
   execute('git', ['add', '--', 'staged.txt'], destination);
   writeFileSync(join(destination, 'staged.txt'), 'additional unstaged example\n');
+  const aiSteps = [
+    { prompt: 'Staged review:', answer: 'continue' },
+    { prompt: 'Remote choice:', answer: 'local' },
+    { prompt: 'Type (e.g.', answer: 'docs' },
+    { prompt: 'Scope (optional', answer: '' },
+    { prompt: 'Description (required', answer: 'describe installed flow' },
+    { prompt: 'Review: accept', answer: 'accept' },
+  ];
+  aiSteps.args = ['--ai'];
+  const aiLocal = await interact(installedCli, destination, { ...process.env, GROQ_API_KEY: 'synthetic-not-used' }, aiSteps);
+  assert.equal(aiLocal.stdout, 'docs: describe installed flow\n');
+  assert.match(aiLocal.stderr, /Groq \/ openai\/gpt-oss-20b/);
+  assert.doesNotMatch(aiLocal.stderr, /Sending one request/);
+  const aiDraft = { type: 'docs', scope: '', description: 'describe staged example', body: '', breaking: false, breakingDetails: '', refs: '', footers: '', uncertainty: 'Synthetic transport fixture; check semantics.' };
+  const generatedSteps = [
+    { prompt: 'Staged review:', answer: 'continue' },
+    { prompt: 'Remote choice:', answer: 'send' },
+    { prompt: 'Review: accept', answer: 'accept' },
+  ];
+  generatedSteps.args = ['--ai', '--output', 'ai-message.txt'];
+  generatedSteps.preload = 'data:text/javascript,' + encodeURIComponent(`let count=0;globalThis.fetch=async(url,options)=>{if(++count!==1||url!=='https://api.groq.com/openai/v1/chat/completions'||options.redirect!=='error')throw Error('unexpected request');return Response.json(${JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(aiDraft) } }] })})};`);
+  const generatedAI = await interact(installedCli, destination, { ...process.env, GROQ_API_KEY: 'synthetic-not-used' }, generatedSteps);
+  assert.equal(generatedAI.stdout, 'docs: describe staged example\n');
+  assert.equal(readFileSync(join(destination, 'ai-message.txt'), 'utf8'), generatedAI.stdout);
+  assert.match(generatedAI.stderr, /AI draft received/);
   const indexBefore = readFileSync(join(destination, '.git', 'index'));
   const steps = [
     { prompt: 'Staged review:', answer: 'patch' },

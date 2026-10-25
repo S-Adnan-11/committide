@@ -108,7 +108,8 @@ program.command('changelog')
 program.command('suggest')
   .description('Review staged changes and compose a message locally in an interactive terminal')
   .option('--output <path>', 'also create a new UTF-8 message file, relative to the current directory')
-  .action(async (options: { output?: string }, command: Command) => {
+  .option('--ai', 'offer an explicitly disclosed staged submission to Groq for an editable draft')
+  .action(async (options: { output?: string; ai?: boolean }, command: Command) => {
     // Replace the default immediate signal exit with scoped terminal cleanup.
     process.off('SIGINT', interrupt);
     const io = terminalIO();

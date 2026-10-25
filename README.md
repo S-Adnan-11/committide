@@ -302,11 +302,78 @@ After reviewing a deliberately saved file, you can commit it yourself:
 git commit -F commit-message.txt
 ```
 
-The command never stages, commits, pushes, changes hooks/configuration, or calls a
-provider. It needs no AI credentials and does not infer intent from filenames.
+The command never stages, commits, pushes, or changes hooks/configuration.
+Default local composition needs no AI credentials and makes no provider request.
 `/cancel` at any prompt, the cancel menu, Ctrl+C, and EOF end without an accepted
 message (exit 130). Usage/configuration/Git/output failures use exit 2. Help and
 version work without opening a prompt session or finding a repository.
+
+### Optional remote draft
+
+```sh
+node dist/cli.js suggest --ai
+node dist/cli.js suggest --ai --output commit-message.txt
+```
+
+This mode offers one foreground request to **Groq**, using
+`openai/gpt-oss-20b` at Groq's HTTPS chat-completions endpoint. Each developer
+supplies their own `GROQ_API_KEY` through the process environment. Never put keys
+in arguments, URLs, commit messages, or repository configuration. No key is read
+by local writing, help/version, lint, hooks, history checks, or changelogs.
+For temporary masked input in your own Windows PowerShell session:
+
+```powershell
+$secureKey = Read-Host 'Groq API key' -AsSecureString
+$env:GROQ_API_KEY = [System.Net.NetworkCredential]::new('', $secureKey).Password
+try { node dist/cli.js suggest --ai }
+finally { Remove-Item Env:GROQ_API_KEY; $secureKey.Dispose() }
+```
+
+Only that shell and child processes launched while the variable is set inherit
+it. Do not paste a key into a recorded command or share it in chat.
+
+Before sending, the CLI shows the provider/model, exact staged patch to be sent,
+request size, and omissions. Choose `send`, local writing, keeping the existing
+draft, or cancellation. Only the captured staged patch (including filenames,
+object IDs, modes and context), configured types, instructions and schema are
+submitted. Binary/submodule contents are omitted. Unstaged changes and additional
+repository/author/remote context are excluded. Staged data can itself contain
+secrets: inspect it before sending; no secret-filtering guarantee is made.
+
+The entire serialized JSON request is capped at 5,500 UTF-8 bytes, including
+escaped patch data, instructions, and schema. The completion cap is 1,536 tokens,
+including reasoning, with low reasoning effort and reasoning output hidden.
+Using one byte as a conservative token allowance plus 512 tokens for provider
+overhead gives a planning allowance of 7,548 tokens. This is a local estimate,
+not exact tokenization or a free-quota guarantee. Oversized or incomplete text
+patches refuse before submission; use local writing or a smaller staged logical
+change. There is no automatic staging or partial-text submission.
+
+Groq currently documents a Free plan for this model, subject to account access
+and organization-specific limits. Check your account's tier, billing settings
+and current [rate limits](https://console.groq.com/docs/rate-limits); a key alone
+does not establish free access. Availability and limits can change. The CLI
+does not enable billing, upgrade accounts or switch models/providers.
+See [Groq billing information](https://console.groq.com/docs/billing-faqs).
+
+The total request deadline is 30 seconds and response retention is capped at
+32 KiB. Requests do not follow redirects or retry automatically. Quota errors
+show safe retry-after/limit metadata when available. A timeout or cancellation
+cannot prove the server stopped processing. Choose local writing or deliberately
+try later. Errors retain an existing draft. `ai` in the review menu starts a new
+disclosure and send choice; `local` rejects the draft and starts local fields.
+
+An index/HEAD change before sending invalidates consent. A change while awaiting
+the response discards the stale result and requires refresh without another
+request. Remote structured fields are checked defensively and then pass through
+the same local validator and editable review as local writing. Acceptance and
+output-file protections still apply. Valid format does not prove factual accuracy.
+
+Groq documents no default inference-content retention, with exceptions for
+reliability/abuse investigation and features requiring retained state. Usage
+metadata is retained; account data controls also apply. Review the current
+[Groq data policy](https://console.groq.com/docs/your-data) before submitting code.
+This is not a universal zero-retention promise.
 
 The review fingerprint covers HEAD and every index path, stage, mode, and object
 ID. Changes detected before showing/accepting the draft or publishing its file
@@ -460,9 +527,9 @@ other platforms are not yet verified.
 
 | Platform | Node | Verification |
 | --- | --- | --- |
-| Windows x64 | 22.12.0 | 171 tests and installed tarball checks including suggest passed |
-| Windows x64 | 24.22.1 | 171 tests and installed tarball checks including suggest passed |
-| Windows x64 | 26.12.1 | 171 tests and installed tarball checks including suggest passed |
+| Windows x64 | 22.12.0 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
+| Windows x64 | 24.22.1 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
+| Windows x64 | 26.12.1 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.
@@ -470,6 +537,10 @@ The guided writer has also been exercised through a Windows PTY. Stream tests
 simulate terminal flags for deterministic EOF/cancellation and output assertions;
 they are separate from real terminal evidence. Physical keyboard Ctrl+C has not
 yet been verified.
+
+Remote adapter and integrated AI flow checks use synthetic HTTP responses; a
+live Groq request has not yet been verified. No provider credential is needed
+for the automated suite or installed-package checks.
 
 Production dependency: Commander (MIT), for command routing and help.
 Development dependencies: TypeScript (Apache-2.0) and Node type definitions (MIT).

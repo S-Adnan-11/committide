@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 export async function interact(entry, cwd, env, steps, expected = 0) {
   const bootstrap = 'data:text/javascript,' + encodeURIComponent("Object.defineProperty(process.stdin,'isTTY',{value:true});Object.defineProperty(process.stderr,'isTTY',{value:true});");
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--import', bootstrap, entry, 'suggest', ...(steps.args ?? [])], {
+    const child = spawn(process.execPath, ['--import', bootstrap, ...(steps.preload ? ['--import', steps.preload] : []), entry, 'suggest', ...(steps.args ?? [])], {
       cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '', pending = '';

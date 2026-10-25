@@ -1,11 +1,12 @@
 import { lintMessage } from './message.js';
 import { loadConfig } from './config.js';
-import { captureStaged, stagedCurrent, stagedOverview, stagedPatch } from './staged.js';
+import { captureStaged, stagedCurrent, stagedOverview, stagedPatch, stagedSubmission } from './staged.js';
 import { terminalText } from './changelog.js';
 import { messageDestination, saveMessage } from './suggest-file.js';
 import { SuggestCancelled } from './suggest-io.js';
 import type { SuggestIO } from './suggest-io.js';
 import { OperationalError } from './errors.js';
+import { prepareGroq, requestGroq, GROQ_MODEL, REQUEST_LIMIT, COMPLETION_LIMIT } from './groq.js';
 
 export interface Draft {
   type: string; scope: string; description: string; body: string;
@@ -26,13 +27,15 @@ const meanings: Readonly<Record<string, string>> = {
 };
 const shown = (text: string) => text.split('\n').map(terminalText).join('\n');
 
-export async function suggest(cwd: string, options: { config?: string; output?: string }, io: SuggestIO): Promise<string | null> {
+export async function suggest(cwd: string, options: { config?: string; output?: string; ai?: boolean }, io: SuggestIO): Promise<string | null> {
   let allowed = await loadConfig(cwd, options.config);
   let snapshot = await captureStaged(cwd);
   io.review(stagedOverview(snapshot));
   if (!snapshot.entries.length && !snapshot.omitted) return null;
   const target = options.output !== undefined ? await messageDestination(cwd, options.output) : undefined;
-  io.review('Describe one logical change in your own words. File count alone does not determine whether changes belong together.\nNo intent is inferred and no code is sent to a service. Type /cancel at any prompt to stop.\n');
+  io.review('Describe one logical change in your own words. File count alone does not determine whether changes belong together.\n'
+    + (options.ai ? 'Remote drafting requires a separate send choice below. ' : 'No intent is inferred and no code is sent to a service. ')
+    + 'Type /cancel at any prompt to stop.\n');
   const ask = async (prompt: string): Promise<string> => {
     io.check();
     const value = await io.ask(prompt);
@@ -84,6 +87,53 @@ export async function suggest(cwd: string, options: { config?: string; output?: 
     io.review(stagedOverview(snapshot));
     if (!snapshot.entries.length && !snapshot.omitted) throw new SuggestCancelled();
   };
+  const local = async () => {
+    Object.assign(draft, { type: '', scope: '', description: '', body: '', breaking: false, breakingDetails: '', refs: '', footers: '' });
+    await type(); await edit('scope'); await edit('description');
+  };
+  const ai = async (): Promise<'generated' | 'local' | 'keep'> => {
+    try {
+      allowed = await loadConfig(cwd, options.config);
+      const patch = await stagedSubmission(snapshot, REQUEST_LIMIT);
+      if (patch === null) { await refresh(); return 'keep'; }
+      const body = prepareGroq(patch, allowed);
+      io.review(`\nRemote draft: Groq / ${GROQ_MODEL}\nThe staged patch below (paths, object IDs, modes, context and changed lines), configured types, instructions and response schema will leave this computer.\n`
+        + `Patch: ${Buffer.byteLength(patch)} UTF-8 bytes; whole request: ${Buffer.byteLength(body)}/${REQUEST_LIMIT} bytes; completion allowance: ${COMPLETION_LIMIT} tokens including reasoning. Bytes are not exact token counts or guaranteed free quota.\n`
+        + 'No partial text patch is sent. Binary contents and submodule contents are omitted; their paths/object metadata may appear. No unstaged content, repository root, author or remote URL is added as context. Staged content itself may contain sensitive information.\n'
+        + 'Review for secrets and accuracy. Groq data policy: https://console.groq.com/docs/your-data\n--- staged submission ---\n'
+        + shown(patch) + '\n--- end submission ---\n');
+      const action = (await ask('Remote choice: send / local / keep / cancel: ')).trim().toLowerCase();
+      if (action === 'cancel') throw new SuggestCancelled();
+      if (action === 'local') return 'local';
+      if (action !== 'send') return 'keep';
+      // Consent covers these exact staged bytes and type policy, not a refresh.
+      const currentAllowed = await loadConfig(cwd, options.config);
+      if (JSON.stringify(allowed) !== JSON.stringify(currentAllowed)) {
+        io.review('Configured types changed. No request sent; review again before choosing AI.\n');
+        return 'keep';
+      }
+      if (!await stagedCurrent(snapshot)) { await refresh(); return 'keep'; }
+      io.check();
+      io.review('Sending one request to Groq. Ctrl+C cancels waiting; it cannot guarantee the server stops processing. No automatic retries.\n');
+      const result = await requestGroq(body, allowed, io.signal);
+      io.check();
+      if (!await stagedCurrent(snapshot)) {
+        io.review('The returned AI draft is stale and was discarded. No new request will be sent automatically.\n');
+        await refresh(); return 'keep';
+      }
+      Object.assign(draft, result.draft);
+      io.review(`AI draft received; edit or reject it after checking the staged changes.\nUncertainty: ${shown(result.uncertainty || 'Not supplied; accuracy still needs your review.')}\n`);
+      if (result.quota) io.review(`Groq quota metadata: ${result.quota}\n`);
+      // The shared review loop reloads configuration and runs the common linter.
+      return 'generated';
+    } catch (error) {
+      io.check();
+      if (error instanceof SuggestCancelled) throw error;
+      if (!(error instanceof OperationalError) || !error.rule.startsWith('ai-')) throw error;
+      io.review(`Remote drafting failed [${error.rule}]: ${error.message}\nYour existing draft is retained. Local composition is available; another request needs a deliberate AI and send choice.\n`);
+      return 'keep';
+    }
+  };
   // A deliberate review action precedes composition; patch is optional and bounded.
   while (true) {
     const action = (await ask('Staged review: patch / continue / cancel: ')).trim().toLowerCase();
@@ -94,7 +144,7 @@ export async function suggest(cwd: string, options: { config?: string; output?: 
     } else if (action === 'continue') break;
     else io.review('Choose patch, continue, or cancel.\n');
   }
-  await type(); await edit('scope'); await edit('description');
+  if (!options.ai || await ai() !== 'generated') await local();
   while (true) {
     io.check();
     if (!await stagedCurrent(snapshot)) { await refresh(); continue; }
@@ -105,9 +155,13 @@ export async function suggest(cwd: string, options: { config?: string; output?: 
     for (const diagnostic of result.diagnostics) io.review(`error [${diagnostic.rule}] line ${diagnostic.line}: ${terminalText(diagnostic.message)}\n`);
     io.review('Format validation cannot establish semantic accuracy. Review the complete message and staged changes.\n');
     if (target) io.review(`Accept will also create ${terminalText(JSON.stringify(target))}.\n`);
-    const action = (await ask('Review: accept / edit / advanced / patch / refresh / cancel: ')).trim().toLowerCase();
+    const action = (await ask(`Review: accept / edit / advanced / patch / refresh${options.ai ? ' / ai / local' : ''} / cancel: `)).trim().toLowerCase();
     if (action === 'cancel') throw new SuggestCancelled();
-    if (action === 'edit' || action === 'advanced') {
+    if (options.ai && action === 'ai') {
+      if (await ai() === 'local') await local();
+    } else if (options.ai && action === 'local') {
+      await local();
+    } else if (action === 'edit' || action === 'advanced') {
       await edit((await ask('Field: type / scope / description / body / breaking / refs / footers: ')).trim().toLowerCase());
     } else if (action === 'patch') {
       const patch = await stagedPatch(snapshot);
@@ -126,6 +180,6 @@ export async function suggest(cwd: string, options: { config?: string; output?: 
       if (target && !await saveMessage(target, message, () => stagedCurrent(snapshot), () => io.check())) { await refresh(); continue; }
       io.review(target ? 'Accepted and saved. You remain in control of committing.\n' : 'Accepted. You remain in control of committing.\n');
       return message;
-    } else io.review('Choose accept, edit, advanced, patch, refresh, or cancel.\n');
+    } else io.review(`Choose accept, edit, advanced, patch, refresh${options.ai ? ', ai, local' : ''}, or cancel.\n`);
   }
 }

@@ -7,7 +7,7 @@ import { environment, init, change, cli, invoke } from './git-helpers.mjs';
 import { interact } from './terminal-helpers.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'committide-suggest-cli-'));
-const env = { ...environment(root), OPENAI_API_KEY: 'fixture-not-a-credential', ANTHROPIC_API_KEY: 'fixture-not-a-credential' };
+const env = { ...environment(root), GROQ_API_KEY: 'fixture-not-a-credential', OPENAI_API_KEY: 'fixture-not-a-credential', ANTHROPIC_API_KEY: 'fixture-not-a-credential' };
 after(() => rmSync(root, { recursive: true, force: true }));
 let count = 0;
 function fixture() {

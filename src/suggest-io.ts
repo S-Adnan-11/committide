@@ -6,6 +6,7 @@ export class SuggestCancelled extends Error {
 }
 
 export interface SuggestIO {
+  signal?: AbortSignal;
   ask(prompt: string): Promise<string>;
   review(text: string): void;
   check(): void;
@@ -18,10 +19,12 @@ export function terminalIO(): SuggestIO & { close(): void } {
   }
   const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true, historySize: 0 });
   const queue: string[] = [];
+  const controller = new AbortController();
   let failure: Error | undefined;
   let waiting: { resolve(value: string): void; reject(error: Error): void } | undefined;
   const stop = (error: Error) => {
     failure ??= error;
+    controller.abort();
     waiting?.reject(failure);
     waiting = undefined;
     rl.close();
@@ -33,6 +36,7 @@ export function terminalIO(): SuggestIO & { close(): void } {
   process.stdin.on('error', inputError);
   rl.on('close', () => {
     failure ??= new SuggestCancelled();
+    controller.abort();
     waiting?.reject(failure);
     waiting = undefined;
   });
@@ -46,6 +50,7 @@ export function terminalIO(): SuggestIO & { close(): void } {
     } else queue.push(line);
   });
   return {
+    signal: controller.signal,
     check() { if (failure) throw failure; },
     review(text) { process.stderr.write(text); },
     async ask(prompt) {
