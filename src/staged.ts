@@ -100,3 +100,15 @@ export async function stagedPatch(snapshot: StagedSnapshot): Promise<string | nu
   return `Staged patch (binary contents and submodule contents are not reviewed):\n${display}\n`
     + (result.truncated ? `Patch truncated at ${PATCH_LIMIT} bytes; omitted content has not been reviewed.\n` : 'End of staged patch.\n');
 }
+
+/** Complete bounded index-only text for a separately disclosed remote request. */
+export async function stagedSubmission(snapshot: StagedSnapshot, limit: number): Promise<string | null> {
+  if (!await stagedCurrent(snapshot)) return null;
+  if (snapshot.omitted) throw new OperationalError('ai-budget', 'The staged overview is incomplete. Use local composition or stage a smaller logical change.');
+  const result = await gitPrefix(snapshot.root, [...diffOptions, '--patch', '--full-index', '--unified=3',
+    '--src-prefix=a/', '--dst-prefix=b/', ...(snapshot.head ? [snapshot.head] : []), '--'], limit);
+  if (!await stagedCurrent(snapshot)) return null;
+  if (result.truncated) throw new OperationalError('ai-budget', 'The complete staged patch exceeds the remote request budget. Use local composition or stage a smaller logical change.');
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(result.bytes); }
+  catch { throw new OperationalError('ai-input', 'The staged patch is not UTF-8. Use local composition.'); }
+}

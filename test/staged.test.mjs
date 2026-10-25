@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
-import { captureStaged, stagedCurrent, stagedPatch, stagedOverview, stagedEntries } from '../dist/staged.js';
+import { captureStaged, stagedCurrent, stagedPatch, stagedOverview, stagedEntries, stagedSubmission } from '../dist/staged.js';
 import { environment, init, git, commit, change } from './git-helpers.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'committide-staged-'));
@@ -23,11 +23,16 @@ test('initial, empty and partially staged sets use the index and preserve reposi
   const patch = await stagedPatch(snap);
   assert.match(patch, /\+staged content/);
   assert.doesNotMatch(patch, /unstaged secret/);
+  assert.match(await stagedSubmission(snap, 5500), /\+staged content/);
+  assert.doesNotMatch(await stagedSubmission(snap, 5500), /unstaged secret/);
+  await assert.rejects(stagedSubmission(snap, 8), /exceeds/);
+  await assert.rejects(stagedSubmission({ ...snap, omitted: true }, 5500), /incomplete/);
   assert.deepEqual(readFileSync(join(cwd, '.git', 'index')), index);
   assert.deepEqual(readFileSync(join(cwd, '.git', 'config')), config);
   assert.equal(readFileSync(join(cwd, 'file with spaces.txt'), 'utf8'), 'unstaged secret\n');
   commit(cwd, env, 'feat: initial');
   assert.equal(await stagedCurrent(snap), false);
+  assert.equal(await stagedSubmission(snap, 5500), null);
   assert.equal((await captureStaged(cwd)).entries.length, 0);
 });
 
