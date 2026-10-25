@@ -132,8 +132,58 @@ also use stdout. Message content is not echoed in diagnostics.
 | 2 | Usage, input, configuration, or operational error |
 | 130 | Interactive interruption (Ctrl+C) |
 
-Hooks, history checking, changelog generation, and writing assistance are not
-implemented in this version. No installation hook is registered.
+Changelog generation and writing assistance are not implemented in this version.
+No installation hook is registered.
+
+## Check Git history
+
+```sh
+node dist/cli.js check --from v1.0.0 --to HEAD
+```
+
+For a locally installed dependency, use `npm exec -- committide check --from REF --to REF`.
+Both boundaries are required and must resolve to single commits; annotated tags
+are peeled. The range is Git's two-dot reachability difference: commits reachable
+from `--to` excluding everything reachable from `--from`. Nonancestor boundaries
+are supported. Neither boundary is a date filter. Whitespace, option-like refs,
+ranges, and operators expanding to multiple revisions are rejected.
+
+Complete UTF-8 messages are checked in deterministic reverse topological order.
+The command reports checked/failed/skipped counts, commit IDs, and rule diagnostics.
+No commits are skipped. An empty range succeeds with an explicit empty-range
+message. Any message failure returns 1; missing Git/repository/refs/objects or
+invalid configuration returns 2. Shallow repositories are refused: obtain full
+history first, for example with `git fetch --unshallow`. The command itself never
+fetches, changes refs, checks out files, or edits the index/worktree/configuration.
+Git replacement objects are ignored, and partial-clone lazy fetching is disabled.
+Non-UTF-8 history is an operational error rather than silently recoded text.
+
+Configuration uses the current working directory and `--config` precedence above;
+configuration from historical commits is never executed or loaded automatically.
+All messages are checked strictly, including Git-generated merge/revert subjects
+and unresolved `fixup!`, `squash!`, or `amend!` subjects. Use conventional messages
+for finished history; a prefix alone never grants an exemption.
+
+A CI step after checkout and `npm ci`/`npm run build` can reuse the command:
+
+```yaml
+- uses: actions/checkout@v7
+  with:
+    fetch-depth: 0
+- uses: actions/setup-node@v7
+  with:
+    node-version: 24
+    cache: npm
+- run: npm ci
+- run: npm run build
+- run: node dist/cli.js check --from "$BASE_SHA" --to "$HEAD_SHA"
+  env:
+    BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+```
+
+Use this fragment in a pull-request workflow; both SHAs must be locally available.
+It is a usage example, not a claim that hosted CI or another OS has been tested.
 
 ## Contributing and verification
 
@@ -159,7 +209,7 @@ other platforms are not yet verified.
 | --- | --- | --- |
 | Windows x64 | 22.12.0 | 89 tests and installed tarball checks passed |
 | Windows x64 | 24.22.1 | 89 tests and installed tarball checks passed |
-| Windows x64 | 26.12.1 | 89 tests and installed tarball checks passed |
+| Windows x64 | 26.12.1 | 96 tests and installed tarball checks passed |
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.

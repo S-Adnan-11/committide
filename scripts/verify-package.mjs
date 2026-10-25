@@ -59,6 +59,17 @@ try {
   assert.equal(execute(process.execPath, [installedCli, 'lint', '--message', 'feat: installed'], destination).stdout, 'Message is valid.\n');
   assert.equal(execute(process.execPath, [installedCli, 'lint', '--message', 'invalid'], destination, 1).stdout, '');
   assert.equal(execute(process.execPath, [installedCli, 'lint'], destination, 0, 'FIX: piped\n').stderr, '');
+  execute('git', ['init', '--initial-branch=main'], destination);
+  const makeCommit = message => execute('git', [
+    '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+    '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+    'commit', '--allow-empty', '-m', message,
+  ], destination);
+  makeCommit('chore: base');
+  makeCommit('fix: installed history');
+  assert.equal(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination).stdout, 'Checked 1; failed 0; skipped 0.\n');
+  makeCommit('malformed history');
+  assert.match(execute(process.execPath, [installedCli, 'check', '--from', 'HEAD~1', '--to', 'HEAD'], destination, 1).stderr, /header-format/);
   // Exercise npm's actual platform executable shim with fixed commands.
   if (process.platform === 'win32') {
     for (const [command, code] of [
@@ -74,7 +85,7 @@ try {
     execute(shim, ['lint', '--message', 'feat: installed shim'], destination);
     execute(shim, ['lint', '--message', 'invalid'], destination, 1);
   }
-  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified help/version/message/stdin/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
+  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
   console.log(`Archive: ${packed.filename}; integrity: ${packed.integrity}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });

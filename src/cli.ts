@@ -4,6 +4,7 @@ import { Command, CommanderError } from 'commander';
 import { loadConfig } from './config.js';
 import { OperationalError } from './errors.js';
 import { lintMessage } from './message.js';
+import { checkHistory } from './history.js';
 
 interface LintOptions { message?: string; file?: string }
 
@@ -57,6 +58,22 @@ program.command('lint')
     } else {
       process.stdout.write('Message is valid.\n');
     }
+  });
+
+program.command('check')
+  .description('Validate complete messages in the source-exclusive Git reachability range')
+  .requiredOption('--from <ref>', 'exclude commits reachable from this commit')
+  .requiredOption('--to <ref>', 'include commits reachable from this commit')
+  .action(async (options: { from: string; to: string }, command: Command) => {
+    const allowedTypes = await loadConfig(process.cwd(), command.optsWithGlobals<{ config?: string }>().config);
+    const result = await checkHistory(process.cwd(), options.from, options.to, allowedTypes);
+    for (const failure of result.failures) {
+      for (const diagnostic of failure.diagnostics) {
+        process.stderr.write(`error [${diagnostic.rule}] commit ${failure.oid} line ${diagnostic.line}: ${diagnostic.message}\n`);
+      }
+    }
+    process.stdout.write(`${result.checked ? '' : 'Empty range. ' }Checked ${result.checked}; failed ${result.failed}; skipped ${result.skipped}.\n`);
+    process.exitCode = result.failed ? 1 : 0;
   });
 
 process.once('SIGINT', () => { process.exit(130); });
