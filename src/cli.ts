@@ -11,6 +11,8 @@ import { generateChangelog, terminalText } from './changelog.js';
 import type { ChangelogOptions } from './changelog.js';
 import { join } from 'node:path';
 import { prepareChangelogFile } from './changelog-file.js';
+import { suggest } from './suggest.js';
+import { SuggestCancelled, terminalIO } from './suggest-io.js';
 
 interface LintOptions { message?: string; file?: string }
 
@@ -103,6 +105,19 @@ program.command('changelog')
     else process.stdout.write(result.markdown);
   });
 
+program.command('suggest')
+  .description('Review staged changes and compose a message locally in an interactive terminal')
+  .option('--output <path>', 'also create a new UTF-8 message file, relative to the current directory')
+  .action(async (options: { output?: string }, command: Command) => {
+    // Replace the default immediate signal exit with scoped terminal cleanup.
+    process.off('SIGINT', interrupt);
+    const io = terminalIO();
+    try {
+      const message = await suggest(process.cwd(), { ...options, ...command.optsWithGlobals<{ config?: string }>() }, io);
+      if (message !== null) process.stdout.write(message);
+    } finally { io.close(); }
+  });
+
 const hooks = program.command('hooks').description('Explicitly install or remove a repository-local commit-msg hook');
 for (const action of ['install', 'uninstall'] as const) {
   hooks.command(action).action(async (_options: unknown, command: Command) => {
@@ -131,12 +146,16 @@ program.command('hook', { hidden: true })
     if (result.diagnostics.length) process.exitCode = 1;
   });
 
-process.once('SIGINT', () => { process.exit(130); });
+const interrupt = () => { process.exit(130); };
+process.once('SIGINT', interrupt);
 try {
   if (process.argv.length === 2) program.help();
   await program.parseAsync();
 } catch (error) {
-  if (error instanceof CommanderError) {
+  if (error instanceof SuggestCancelled) {
+    process.stderr.write('Cancelled; no message emitted.\n');
+    process.exitCode = 130;
+  } else if (error instanceof CommanderError) {
     process.exitCode = error.exitCode === 0 ? 0 : 2;
   } else {
     const rule = error instanceof OperationalError ? error.rule : 'operation';

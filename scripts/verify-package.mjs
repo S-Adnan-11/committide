@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
+import { interact } from '../test/terminal-helpers.mjs';
 
 // Run via npm so the same npm installation is available across Windows and POSIX.
 assert.ok(process.env.npm_execpath, 'Run npm run verify:package');
@@ -59,12 +60,37 @@ try {
   const manifest = JSON.parse(readFileSync(join(destination, 'node_modules', 'committide', 'package.json'), 'utf8'));
   assert.equal(manifest.bin.committide, 'dist/cli.js');
   const installedCli = join(destination, 'node_modules', 'committide', manifest.bin.committide);
+  assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--output/);
+  assert.match(execute(process.execPath, [installedCli, 'suggest'], destination, 2).stderr, /suggest-terminal/);
   assert.match(execute(process.execPath, [installedCli, '--help'], destination).stdout, /lint/);
   assert.equal(execute(process.execPath, [installedCli, '--version'], destination).stdout.trim(), manifest.version);
   assert.equal(execute(process.execPath, [installedCli, 'lint', '--message', 'feat: installed'], destination).stdout, 'Message is valid.\n');
   assert.equal(execute(process.execPath, [installedCli, 'lint', '--message', 'invalid'], destination, 1).stdout, '');
   assert.equal(execute(process.execPath, [installedCli, 'lint'], destination, 0, 'FIX: piped\n').stderr, '');
   execute('git', ['init', '--initial-branch=main'], destination);
+  writeFileSync(join(destination, 'staged.txt'), 'staged example\n');
+  execute('git', ['add', '--', 'staged.txt'], destination);
+  writeFileSync(join(destination, 'staged.txt'), 'additional unstaged example\n');
+  const indexBefore = readFileSync(join(destination, '.git', 'index'));
+  const steps = [
+    { prompt: 'Staged review:', answer: 'patch' },
+    { prompt: 'Staged review:', answer: 'continue' },
+    { prompt: 'Type (e.g.', answer: 'feat' },
+    { prompt: 'Scope (optional', answer: '' },
+    { prompt: 'Description (required', answer: 'installed writer' },
+    { prompt: 'Review: accept', answer: 'accept' },
+  ];
+  steps.args = ['--output', 'installed-message.txt'];
+  const suggestion = await interact(installedCli, destination, {
+    ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(scratch, 'absent-global-config'),
+    OPENAI_API_KEY: 'fixture-not-a-credential', ANTHROPIC_API_KEY: 'fixture-not-a-credential',
+  }, steps);
+  assert.equal(suggestion.stdout, 'feat: installed writer\n');
+  assert.match(suggestion.stderr, /\+staged example/);
+  assert.doesNotMatch(suggestion.stderr, /\+additional unstaged/);
+  assert.equal(readFileSync(join(destination, 'installed-message.txt'), 'utf8'), suggestion.stdout);
+  assert.deepEqual(readFileSync(join(destination, '.git', 'index')), indexBefore);
+  execute(process.execPath, [installedCli, 'lint', '--file', 'installed-message.txt'], destination);
   const makeCommit = message => execute('git', [
     '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
     '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
@@ -100,6 +126,8 @@ try {
     for (const [command, code] of [
       ['node_modules\\.bin\\committide.cmd --help', 0],
       ['node_modules\\.bin\\committide.cmd --version', 0],
+      ['node_modules\\.bin\\committide.cmd suggest --help', 0],
+      ['node_modules\\.bin\\committide.cmd suggest', 2],
       ['node_modules\\.bin\\committide.cmd lint --message "feat: installed shim"', 0],
       ['node_modules\\.bin\\committide.cmd lint --message invalid', 1],
     ]) execute(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', command], destination, code);
@@ -107,10 +135,12 @@ try {
     const shim = join(destination, 'node_modules', '.bin', 'committide');
     execute(shim, ['--help'], destination);
     execute(shim, ['--version'], destination);
+    execute(shim, ['suggest', '--help'], destination);
+    execute(shim, ['suggest'], destination, 2);
     execute(shim, ['lint', '--message', 'feat: installed shim'], destination);
     execute(shim, ['lint', '--message', 'invalid'], destination, 1);
   }
-  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/changelog/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
+  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/changelog/suggest/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
   console.log(`Archive: ${packed.filename}; integrity: ${packed.integrity}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });

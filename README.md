@@ -262,6 +262,68 @@ cannot be enforced by this hook. Local hooks are bypassable with `--no-verify`;
 run range checking in CI for an additional enforcement boundary. Passing format
 checks still does not establish whether a message accurately describes changes.
 
+## Write a commit message
+
+```sh
+node dist/cli.js suggest
+node dist/cli.js suggest --output commit-message.txt
+```
+
+Run `suggest` in a terminal with changes already staged. It shows repository-root
+paths, Git status and mode changes, then offers a staged patch before asking for
+a configured type, optional scope, and your description. Additional unstaged edits
+in the same files are excluded. An initial commit is supported. Nothing staged
+means no draft. File count alone does not tell you whether changes belong in one
+logical commit; review the staged set and describe its purpose yourself.
+
+The review menu offers `accept`, `edit`, `advanced`, `patch`, `refresh`, and
+`cancel`. Edit any field, or use advanced fields for a multiline body, an explicit
+breaking change with migration details, neutral `Refs` references, and other
+footers. End multiline entry with `.done` alone; an empty entry clears that field.
+The complete message is shown after each edit. Invalid fields are retained and
+reported by the same validator used by lint, history checking, and hooks. They
+must be corrected before acceptance. Standard types have short explanations;
+configured custom types remain available. Formatting success does not establish
+semantic accuracy or detect API compatibility.
+
+Prompts, patch review, and diagnostics go to stderr. Only the accepted UTF-8
+message goes to stdout. Both stdin and stderr must be interactive terminals;
+piped answers are rejected immediately with exit 2. Stdout can be redirected,
+although the shell then controls file creation/truncation. Prefer `--output` for
+guarded creation: it resolves relative to the invocation directory, requires a
+new filename and real existing parent directories, and refuses Git metadata,
+symlinks/junctions, and existing files. It writes only after acceptance and a final
+snapshot check, using a complete synced temporary file and a non-overwriting
+hard link. A destination appearing concurrently is preserved. Hard-link support
+is required; interruption can leave `.committide-message-*.tmp` for inspection.
+After reviewing a deliberately saved file, you can commit it yourself:
+
+```sh
+git commit -F commit-message.txt
+```
+
+The command never stages, commits, pushes, changes hooks/configuration, or calls a
+provider. It needs no AI credentials and does not infer intent from filenames.
+`/cancel` at any prompt, the cancel menu, Ctrl+C, and EOF end without an accepted
+message (exit 130). Usage/configuration/Git/output failures use exit 2. Help and
+version work without opening a prompt session or finding a repository.
+
+The review fingerprint covers HEAD and every index path, stage, mode, and object
+ID. Changes detected before showing/accepting the draft or publishing its file
+require refresh and renewed review; typed fields are retained. A refreshed empty
+index cancels. Snapshot checks do not lock other Git processes: a change after
+the last check can still happen, so review again before committing later.
+
+Overview retention is limited to 256 KiB and at most 100 displayed entries;
+patch retention is 64 KiB, with explicit truncation notices. Git output is drained
+with bounded memory and a 30-second inspection timeout. Unusual paths are quoted,
+terminal controls are made visible, and binary/submodule contents are not
+interpreted. Symlink targets are not traversed. Rename detection is Git's
+similarity heuristic with an exhaustive-search limit of 1000; some changes may
+appear as additions/deletions. External diff and text-conversion helpers are
+disabled. Omitted material has not received a complete content review; use your
+usual Git tools to inspect it before accepting a message.
+
 ## Release notes
 
 ```sh
@@ -398,13 +460,16 @@ other platforms are not yet verified.
 
 | Platform | Node | Verification |
 | --- | --- | --- |
-| Windows x64 | 22.12.0 | 145 tests and installed tarball checks passed |
-| Windows x64 | 24.22.1 | 145 tests and installed tarball checks passed |
-| Windows x64 | 26.12.1 | 145 tests and installed tarball checks passed |
+| Windows x64 | 22.12.0 | 171 tests and installed tarball checks including suggest passed |
+| Windows x64 | 24.22.1 | 171 tests and installed tarball checks including suggest passed |
+| Windows x64 | 26.12.1 | 171 tests and installed tarball checks including suggest passed |
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.
-Interactive Ctrl+C behavior has not yet been verified with a real terminal.
+The guided writer has also been exercised through a Windows PTY. Stream tests
+simulate terminal flags for deterministic EOF/cancellation and output assertions;
+they are separate from real terminal evidence. Physical keyboard Ctrl+C has not
+yet been verified.
 
 Production dependency: Commander (MIT), for command routing and help.
 Development dependencies: TypeScript (Apache-2.0) and Node type definitions (MIT).

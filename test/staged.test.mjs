@@ -78,6 +78,20 @@ test('large patches and many files have explicit bounded omissions', async () =>
   assert.ok(patch.length < 67000);
 });
 
+test('unusual paths survive a real Git index without needing filesystem traversal', async () => {
+  const cwd = init(root, 'unusual index paths', env);
+  const blob = git(cwd, env, ['hash-object', '-w', '--stdin'], 0, 'index only\n').stdout.trim();
+  for (const path of ['with\ttab', 'with\nnewline', 'with"quote', '雪 space']) {
+    // Index-only fixture: Windows normally refuses filesystem-incompatible names.
+    git(cwd, env, ['-c', 'core.protectNTFS=false', 'update-index', '--add', '--cacheinfo', `100644,${blob},${path}`]);
+  }
+  const snap = await captureStaged(cwd);
+  assert.equal(snap.entries.length, 4);
+  assert.match(snap.entries.join('\n'), /\\t/);
+  assert.match(snap.entries.join('\n'), /\\n/);
+  assert.match(await stagedPatch(snap), /index only/);
+});
+
 test('staged objects, modes, paths and HEAD invalidate snapshots; unstaged edits do not', async () => {
   const cwd = init(root, 'stale snapshots', env);
   change(cwd, env, 'one', 'first\n');

@@ -6,7 +6,7 @@ import { OperationalError } from './errors.js';
 /** Drain and hash all stdout, retaining only a bounded prefix for display. */
 export async function gitPrefix(cwd: string, args: readonly string[], limit: number): Promise<{ bytes: Buffer; truncated: boolean; hash: string }> {
   return new Promise((accept, reject) => {
-    const child = spawn('git', ['--no-replace-objects', '--no-lazy-fetch', ...args], {
+    const child = spawn('git', ['--no-replace-objects', '--no-lazy-fetch', '-c', 'core.fsmonitor=false', ...args], {
       cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_NO_LAZY_FETCH: '1', GIT_OPTIONAL_LOCKS: '0' },
     });
