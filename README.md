@@ -1,7 +1,8 @@
 # CommitTide
 
-CommitTide validates Conventional Commits messages locally. It accepts message
-text, a UTF-8 file, or piped standard input, and supports JSON type configuration.
+CommitTide validates Conventional Commits messages, checks Git history, helps
+compose messages from staged changes, and generates release notes. Message linting
+accepts text, a UTF-8 file, or piped standard input, with JSON type configuration.
 No account, credentials, network request, or Git repository is needed for linting.
 
 This is a local development package. Registry installation has not been verified.
@@ -127,13 +128,14 @@ also use stdout. Message content is not echoed in diagnostics.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Valid message, help, or version |
-| 1 | Message rejected by format or type policy |
+| 0 | Successful operation, valid message, help, or version |
+| 1 | Message or checked history rejected by format or type policy |
 | 2 | Usage, input, configuration, or operational error |
-| 130 | Interactive interruption (Ctrl+C) |
+| 130 | Interactive cancellation, EOF, or interruption (Ctrl+C) |
 
-Commit-writing assistance is not implemented in this version.
-No installation hook is registered.
+Local message composition is available through `suggest`, with an optional remote
+draft described below. npm installation never installs a Git hook; hook setup is
+an explicit command.
 
 ## Check Git history
 
@@ -524,6 +526,14 @@ privilege or Developer Mode; directory-junction and other path checks still run.
 Runtime requirements follow [Commander 15](https://github.com/tj/commander.js)'s
 Node 22.12.0 minimum. Actual platform/runtime verification is recorded below;
 other platforms are not yet verified.
+
+The [verification workflow](.github/workflows/verify.yml) runs type checking,
+tests, and installed-package checks on standard Windows, Linux, and macOS runners
+with Node 22.12.0, 24, and 26. It runs for pushes to `main`, pull requests, and
+manual dispatch in public repositories. No provider credentials are required;
+remote drafting tests use synthetic responses. The workflow does not publish
+packages or create releases. A configured matrix is not evidence of a passing run;
+inspect the completed jobs before extending the compatibility claims below.
 
 | Platform | Node | Verification |
 | --- | --- | --- |

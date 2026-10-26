@@ -44,7 +44,7 @@ async function readMessage(options: LintOptions): Promise<string> {
 
 const program = new Command()
   .name('committide')
-  .description('Lint Conventional Commits messages locally')
+  .description('Validate commit messages, compose drafts, and generate release notes')
   .version(JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version as string)
   .option('--config <path>', 'read an explicit JSON configuration instead of discovery')
   .showHelpAfterError()
