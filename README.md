@@ -13,6 +13,8 @@ The package is marked private and unlicensed while distribution details are sett
 Use Node.js 22.12.0 or newer and npm:
 
 ```sh
+git clone https://github.com/S-Adnan-11/committide.git
+cd committide
 npm ci
 npm run build
 node dist/cli.js --help
@@ -497,8 +499,8 @@ Replacement atomicity and edit detection are separate: the snapshot checks and
 lock prevent competing cooperative writers from overwriting one another, but
 portable filesystem APIs do not provide compare-and-swap against an uncooperative
 external editor between the final check and rename. Review and retry a detected
-conflict. These safeguards have been exercised on Windows local storage; other
-filesystems and platforms remain unverified.
+conflict. These safeguards have been exercised on Windows local storage and
+Linux/macOS hosted runners. Other filesystems and configurations remain unverified.
 
 ## Contributing and verification
 
@@ -525,7 +527,7 @@ privilege or Developer Mode; directory-junction and other path checks still run.
 
 Runtime requirements follow [Commander 15](https://github.com/tj/commander.js)'s
 Node 22.12.0 minimum. Actual platform/runtime verification is recorded below;
-other platforms are not yet verified.
+other configurations have not been verified.
 
 The [verification workflow](https://github.com/S-Adnan-11/committide/actions/workflows/verify.yml) runs type checking,
 tests, and installed-package checks on standard Windows, Linux, and macOS runners
@@ -540,6 +542,14 @@ inspect the completed jobs before extending the compatibility claims below.
 | Windows x64 | 22.12.0 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
 | Windows x64 | 24.22.1 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
 | Windows x64 | 26.12.1 | 205 tests and installed tarball checks, including mocked AI drafting, passed |
+| Ubuntu 24.04 hosted runner | 22.12.0, 24.21.0, 26.12.1 | 205 tests and installed tarball checks passed on each runtime |
+| macOS 26 arm64 hosted runner | 22.12.0, 24.21.0, 26.12.1 | 205 tests and installed tarball checks passed on each runtime |
+
+The [completed verification run](https://github.com/S-Adnan-11/committide/actions/runs/40404902469)
+passed all nine Windows/Linux/macOS jobs, including type checking, all 205 tests
+without skips, and installed executable checks. The Node 24 jobs resolved to
+24.22.1 on Windows and 24.21.0 on Linux/macOS. A fresh remote clone also passed
+dependency installation, type checking, tests, and packed-install checks on Windows.
 
 The test suite simulates the terminal flag for its missing-input check. A separate
 real terminal invocation also confirmed immediate missing-input feedback.
