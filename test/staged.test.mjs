@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
 import { captureStaged, stagedCurrent, stagedPatch, stagedOverview, stagedEntries, stagedSubmission } from '../dist/staged.js';
 import { environment, init, git, commit, change } from './git-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-staged-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-staged-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 

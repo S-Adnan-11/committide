@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, symlinkSync, linkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, symlinkSync, linkSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test, { after } from 'node:test';
 import { environment, init, git, invoke, commit, change, run } from './git-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-hooks-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-hooks-')));
 const env = environment(root);
 const source = dirname(dirname(fileURLToPath(import.meta.url)));
 const npmPath = process.env.npm_execpath;
@@ -181,7 +181,9 @@ test('missing/changed dependency and lock setup fail closed; uninstall works aft
   const gitBinary = process.platform === 'win32'
     ? run('where.exe', ['git'], cwd, env).stdout.trim().split(/\r?\n/)[0]
     : run('which', ['git'], cwd, env).stdout.trim();
-  const noNode = { ...env, PATH: dirname(gitBinary) };
+  const emptyPath = join(cwd, 'empty runtime path');
+  mkdirSync(emptyPath);
+  const noNode = { ...env, PATH: emptyPath };
   assert.match(run(gitBinary, ['commit', '--allow-empty', '-m', 'fix: no runtime'], cwd, noNode, 1).stderr, /Node.js.*required/);
 });
 

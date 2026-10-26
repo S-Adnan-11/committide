@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test, { after } from 'node:test';
 
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
-const root = mkdtempSync(join(tmpdir(), 'committide-cli-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-cli-')));
 after(() => rmSync(root, { recursive: true, force: true }));
 const run = (args, options = {}) => {
   const result = spawnSync(process.execPath, [cli, ...args], {

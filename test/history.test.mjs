@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
 import { environment, init, git, invoke, commit, change, run, cli } from './git-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-history-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-history-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 

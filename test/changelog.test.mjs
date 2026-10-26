@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
 import { environment, init, git, invoke, commit, change } from './git-helpers.mjs';
 import { isReleaseTag, START_MARKER, END_MARKER } from '../dist/changelog.js';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-changelog-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-changelog-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 

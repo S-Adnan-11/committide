@@ -1,10 +1,18 @@
 {
   "name": "committide",
   "version": "0.1.0",
-  "description": "Local Conventional Commits message linting for the command line",
+  "description": "Commit message validation, staged message writing, and release notes for the command line",
   "type": "module",
   "private": true,
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/S-Adnan-11/committide.git"
+  },
+  "homepage": "https://github.com/S-Adnan-11/committide#readme",
+  "bugs": {
+    "url": "https://github.com/S-Adnan-11/committide/issues"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

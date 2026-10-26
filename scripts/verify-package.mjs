@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { interact } from '../test/terminal-helpers.mjs';
 // Run via npm so the same npm installation is available across Windows and POSIX.
 assert.ok(process.env.npm_execpath, 'Run npm run verify:package');
 const source = dirname(dirname(fileURLToPath(import.meta.url)));
-const scratch = mkdtempSync(join(tmpdir(), 'committide-package-'));
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'committide-package-')));
 function execute(binary, args, cwd, expected = 0, input = '') {
   const result = spawnSync(binary, args, {
     cwd, input, encoding: 'utf8', timeout: 120_000,

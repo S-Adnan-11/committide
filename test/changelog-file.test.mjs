@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, statSync, existsSync, rmSync, rmdirSync, symlinkSync, linkSync, readdirSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, readFileSync, writeFileSync, statSync, existsSync, rmSync, rmdirSync, symlinkSync, linkSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
@@ -8,7 +8,7 @@ import { prepareChangelogFile, replaceManagedContent } from '../dist/changelog-f
 import { START_MARKER as start, END_MARKER as end } from '../dist/changelog.js';
 import { environment, init, git, invoke, commit, change } from './git-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-write-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-write-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 const document = content => `# Changelog\n\n## Unreleased\n\nHandwritten notes.\n\n${start}\n${content}\n${end}\n\n## 1.0.0\n\nHistorical notes.\n`;

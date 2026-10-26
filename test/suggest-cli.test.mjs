@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
 import { environment, init, change, cli, invoke } from './git-helpers.mjs';
 import { interact } from './terminal-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-suggest-cli-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-suggest-cli-')));
 const env = { ...environment(root), GROQ_API_KEY: 'fixture-not-a-credential', OPENAI_API_KEY: 'fixture-not-a-credential', ANTHROPIC_API_KEY: 'fixture-not-a-credential' };
 after(() => rmSync(root, { recursive: true, force: true }));
 let count = 0;

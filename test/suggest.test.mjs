@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
@@ -9,7 +9,7 @@ import { messageDestination, saveMessage } from '../dist/suggest-file.js';
 import { lintMessage } from '../dist/message.js';
 import { environment, init, change, commit, git, invoke, run, cli } from './git-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-suggest-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-suggest-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 let counter = 0;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
@@ -8,7 +8,7 @@ import { SuggestCancelled } from '../dist/suggest-io.js';
 import { environment, init, change, git, run, cli } from './git-helpers.mjs';
 import { interact } from './terminal-helpers.mjs';
 
-const root = mkdtempSync(join(tmpdir(), 'committide-ai-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'committide-ai-')));
 const env = environment(root);
 after(() => rmSync(root, { recursive: true, force: true }));
 let count = 0;

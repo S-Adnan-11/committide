@@ -527,7 +527,7 @@ Runtime requirements follow [Commander 15](https://github.com/tj/commander.js)'s
 Node 22.12.0 minimum. Actual platform/runtime verification is recorded below;
 other platforms are not yet verified.
 
-The [verification workflow](.github/workflows/verify.yml) runs type checking,
+The [verification workflow](https://github.com/S-Adnan-11/committide/actions/workflows/verify.yml) runs type checking,
 tests, and installed-package checks on standard Windows, Linux, and macOS runners
 with Node 22.12.0, 24, and 26. It runs for pushes to `main`, pull requests, and
 manual dispatch in public repositories. No provider credentials are required;
