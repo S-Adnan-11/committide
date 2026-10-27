@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { prepareChangelogFile } from './changelog-file.js';
 import { suggest } from './suggest.js';
 import { SuggestCancelled, terminalIO } from './suggest-io.js';
+import { helpBrand, terminalColors } from './brand.js';
 
 interface LintOptions { message?: string; file?: string }
 
@@ -49,6 +50,14 @@ const program = new Command()
   .option('--config <path>', 'read an explicit JSON configuration instead of discovery')
   .showHelpAfterError()
   .exitOverride();
+
+// Normal root help has its own presentation boundary; error and child help do not.
+program.configureOutput({
+  getOutHasColors: () => terminalColors(process.stdout, process.env),
+  getErrHasColors: () => terminalColors(process.stderr, process.env),
+});
+program.addHelpText('before', ({ error }) =>
+  error || process.argv.length === 2 ? '' : helpBrand(process.stdout, process.env));
 
 program.command('lint')
   .description('Validate one message from --message, --file, or piped stdin')

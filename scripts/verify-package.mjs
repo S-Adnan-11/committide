@@ -6,6 +6,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { interact } from '../test/terminal-helpers.mjs';
+import { verifyHelpBranding } from '../test/brand-helpers.mjs';
 
 // Run via npm so the same npm installation is available across Windows and POSIX.
 assert.ok(process.env.npm_execpath, 'Run npm run verify:package');
@@ -61,6 +62,7 @@ try {
   assert.deepEqual(readFileSync(join(destination, 'node_modules', 'committide', 'LICENSE')), entries.get('package/LICENSE'));
   assert.equal(manifest.bin.committide, 'dist/cli.js');
   const installedCli = join(destination, 'node_modules', 'committide', manifest.bin.committide);
+  verifyHelpBranding(installedCli, destination);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--output/);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--ai/);
   assert.match(execute(process.execPath, [installedCli, 'suggest'], destination, 2).stderr, /suggest-terminal/);

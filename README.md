@@ -1,7 +1,32 @@
-# CommitTide
+<img src="https://raw.githubusercontent.com/S-Adnan-11/committide/main/assets/brand/readme-banner.svg" alt="CommitTide — a curling ocean wave over a Git commit node. Good commits. Clear history." width="900">
 
 CommitTide validates Conventional Commits messages, checks Git history, helps
-compose messages from staged changes, and generates release notes. Message linting
+compose messages from staged changes, and generates release notes.
+
+## Quick start
+
+With Node.js 22.12.0 or newer and npm:
+
+```sh
+git clone https://github.com/S-Adnan-11/committide.git
+cd committide
+npm ci
+npm run build
+node dist/cli.js --help
+node dist/cli.js lint --message "feat(cli): add message linting"
+```
+
+For example, linting a fictional tide forecast change produces:
+
+```text
+$ committide lint --message "feat(forecast): add tide times"
+Message is valid.
+
+$ committide lint --message "updated stuff"
+error [header-format] line 1: Use type(scope)!: description; scope and ! are optional, and the description must be nonempty.
+```
+
+The example uses the executable from a locally installed archive. Message linting
 accepts text, a UTF-8 file, or piped standard input, with JSON type configuration.
 No account, credentials, network request, or Git repository is needed for linting.
 
@@ -10,16 +35,10 @@ The package remains marked private; local archive installation is supported.
 
 ## Build and try
 
-Use Node.js 22.12.0 or newer and npm:
+After the quick start, try a file or inspect the version:
 
 ```sh
-git clone https://github.com/S-Adnan-11/committide.git
-cd committide
-npm ci
-npm run build
-node dist/cli.js --help
 node dist/cli.js --version
-node dist/cli.js lint --message "feat(cli): add message linting"
 node dist/cli.js lint --file message.txt
 ```
 
@@ -34,6 +53,14 @@ PowerShell equivalent:
 ```powershell
 'fix: handle empty input' | node dist/cli.js lint
 ```
+
+Explicit top-level help (`committide --help`, `committide -h`, or `committide help`)
+shows the wave in an interactive terminal: full size at 56 columns, compact at
+44–55, and the name alone at smaller or unknown widths. The tagline appears when
+it fits. Bare-command help, subcommand help, errors, CI, and `TERM=dumb` omit the
+banner. Redirected help stays plain. A nonempty `NO_COLOR` or `FORCE_COLOR=0`
+disables colour; `FORCE_COLOR` cannot override these terminal and stream checks.
+Command output and generated messages or notes stay undecorated for piping.
 
 Choose exactly one input source. Piped data conflicts with `--message` or `--file`;
 an empty redirected stdin does not. A terminal with no explicit input returns an
