@@ -4,7 +4,11 @@
   "description": "Commit message validation, staged message writing, and release notes for the command line",
   "type": "module",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "author": {
+    "name": "S. Adnan",
+    "url": "https://s-adnan.dev"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/S-Adnan-11/committide.git"

@@ -45,7 +45,7 @@ try {
     entries.set(name, data.subarray(offset + 512, offset + 512 + size));
     offset += 512 + Math.ceil(size / 512) * 512;
   }
-  const expected = ['package/README.md', 'package/package.json', ...readdirSync(join(source, 'dist')).filter(name => name.endsWith('.js')).map(name => `package/dist/${name}`)].sort();
+  const expected = ['package/LICENSE', 'package/README.md', 'package/package.json', ...readdirSync(join(source, 'dist')).filter(name => name.endsWith('.js')).map(name => `package/dist/${name}`)].sort();
   assert.deepEqual([...entries.keys()].sort(), expected);
   for (const [name, bytes] of entries) {
     // Compare every byte independently of npm's manifest, including automatic metadata.
@@ -58,6 +58,7 @@ try {
   writeFileSync(join(destination, 'package.json'), '{"name":"package-smoke-test","private":true}');
   npm(['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', archive], destination);
   const manifest = JSON.parse(readFileSync(join(destination, 'node_modules', 'committide', 'package.json'), 'utf8'));
+  assert.deepEqual(readFileSync(join(destination, 'node_modules', 'committide', 'LICENSE')), entries.get('package/LICENSE'));
   assert.equal(manifest.bin.committide, 'dist/cli.js');
   const installedCli = join(destination, 'node_modules', 'committide', manifest.bin.committide);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--output/);

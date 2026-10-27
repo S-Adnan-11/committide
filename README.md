@@ -6,7 +6,7 @@ accepts text, a UTF-8 file, or piped standard input, with JSON type configuratio
 No account, credentials, network request, or Git repository is needed for linting.
 
 This is a local development package. Registry installation has not been verified.
-The package is marked private and unlicensed while distribution details are settled.
+The package remains marked private; local archive installation is supported.
 
 ## Build and try
 
@@ -555,8 +555,9 @@ The test suite simulates the terminal flag for its missing-input check. A separa
 real terminal invocation also confirmed immediate missing-input feedback.
 The guided writer has also been exercised through a Windows PTY. Stream tests
 simulate terminal flags for deterministic EOF/cancellation and output assertions;
-they are separate from real terminal evidence. Physical keyboard Ctrl+C has not
-yet been verified.
+they are separate from real terminal evidence. A physical Windows keyboard
+cancellation check passed with exit 130, empty stdout, no saved message, unchanged
+fixture files, and normal input afterward.
 
 Groq drafting has also been exercised once with a small synthetic staged change
 through the installed CLI, including editing, validation, and accepted output.
@@ -568,3 +569,9 @@ Development dependencies: TypeScript (Apache-2.0) and Node type definitions (MIT
 The message parser and type rules live in `src/message.ts`; JSON discovery is in
 `src/config.ts`, and executable input/output is in `src/cli.ts`. The parser uses
 line state for body and footer boundaries, independent of the configured type list.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 S. Adnan.
+
+Author: [S. Adnan](https://s-adnan.dev) ([GitHub](https://github.com/S-Adnan-11)).
