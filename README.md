@@ -1,7 +1,36 @@
-<img src="https://raw.githubusercontent.com/S-Adnan-11/committide/main/assets/brand/readme-banner.svg" alt="CommitTide — a curling ocean wave over a Git commit node. Good commits. Clear history." width="900">
+```text
+$ committide --help
+
+                           .:=+*********+=:.
+                       .:=******************+-
+                     :=************************-
+                   :+***************************+.
+                 .+*******************************
+                -**********************=:.   ..:=*=
+               =*********************-            :
+              =*********************-
+             =**********************.
+            -***********************-
+           .*************************-
+           ****************************-.
+          +******************************+-.
+        .+**********************************=.
+       -*********************+=++=+***********=.
+     :+*********************+%#=-+%#+***********-
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%+    :%%%%%%%%%%%%%%%%#
+:---------------------------%%-..:+%=--------------:
+                            .=#%%%#-
+
+CommitTide
+Good commits. Clear history.
+
+Usage: committide [options] [command]
+```
 
 CommitTide validates Conventional Commits messages, checks Git history, helps
 compose messages from staged changes, and generates release notes.
+
+[`lint`](#message-format) · [`suggest`](#write-a-commit-message) · [`check`](#check-git-history) · [`changelog`](#release-notes)
 
 ## Quick start
 
@@ -596,6 +625,13 @@ Development dependencies: TypeScript (Apache-2.0) and Node type definitions (MIT
 The message parser and type rules live in `src/message.ts`; JSON discovery is in
 `src/config.ts`, and executable input/output is in `src/cli.ts`. The parser uses
 line state for body and footer boundaries, independent of the configured type list.
+
+<details>
+<summary>Brand artwork</summary>
+
+<img src="https://raw.githubusercontent.com/S-Adnan-11/committide/main/assets/brand/readme-banner.svg" alt="CommitTide — a curling ocean wave over a Git commit node. Good commits. Clear history." width="900">
+
+</details>
 
 ## License
 
