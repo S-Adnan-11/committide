@@ -32,17 +32,20 @@ compose messages from staged changes, and generates release notes.
 
 [`lint`](#message-format) · [`suggest`](#write-a-commit-message) · [`check`](#check-git-history) · [`changelog`](#release-notes)
 
-## Quick start
+## Install
 
 With Node.js 22.12.0 or newer and npm:
 
 ```sh
-git clone https://github.com/S-Adnan-11/committide.git
-cd committide
-npm ci
-npm run build
-node dist/cli.js --help
-node dist/cli.js lint --message "feat(cli): add message linting"
+npm install --save-dev --save-exact committide@0.1.0
+npm exec -- committide --help
+npm exec -- committide lint --message "feat(cli): add message linting"
+```
+
+Or run a command without adding a project dependency:
+
+```sh
+npx --yes committide@0.1.0 --help
 ```
 
 For example, linting a fictional tide forecast change produces:
@@ -55,18 +58,19 @@ $ committide lint --message "updated stuff"
 error [header-format] line 1: Use type(scope)!: description; scope and ! are optional, and the description must be nonempty.
 ```
 
-The example uses the executable from a locally installed archive. Message linting
+The example uses the installed `committide` executable. Message linting
 accepts text, a UTF-8 file, or piped standard input, with JSON type configuration.
 No account, credentials, network request, or Git repository is needed for linting.
 
-This is a local development package. Registry installation has not been verified.
-The package remains marked private; local archive installation is supported.
-
 ## Build and try
 
-After the quick start, try a file or inspect the version:
+To run from source:
 
 ```sh
+git clone https://github.com/S-Adnan-11/committide.git
+cd committide
+npm ci
+npm run build
 node dist/cli.js --version
 node dist/cli.js lint --file message.txt
 ```
@@ -254,7 +258,7 @@ First install a reviewed CommitTide tarball or version as a dependency of the
 consuming repository root, committing its npm lockfile with that project:
 
 ```sh
-npm install --save-dev --save-exact /path/to/committide-0.1.0.tgz
+npm install --save-dev --save-exact committide@0.1.0
 node node_modules/committide/dist/cli.js hooks install
 node node_modules/committide/dist/cli.js hooks uninstall
 ```

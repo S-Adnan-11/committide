@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Commit message validation, staged message writing, and release notes for the command line",
   "type": "module",
-  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "license": "MIT",
   "author": {
     "name": "S. Adnan",
