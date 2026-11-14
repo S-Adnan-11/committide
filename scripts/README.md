@@ -8,9 +8,9 @@ node --test test/draft-provider.test.mjs
 ```
 
 `lib/draft-provider.mjs` defines a versioned JSON boundary for mock draft
-providers. It reuses the message assembler, type configuration and linter from
-the build. It is development tooling, excluded from the npm package, and adds
-no CLI option, HTTP client or provider credential handling.
+providers. It reexports the compiled runtime contract in `src/provider.ts`, shared with the
+composer. The development entry point and tests stay outside the npm package.
+The contract itself has no HTTP client or provider credential handling.
 
 Requests carry `{version:1, policy:{allowedTypes}, staged:{complete,entries},
 intent}`. Each entry has a status (`A`, `M`, `D`, `R` or `T`), relative `path`,
