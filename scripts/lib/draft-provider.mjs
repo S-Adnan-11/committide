@@ -97,3 +97,59 @@ export function validateDraftResponse(json, allowedTypes) {
   if (result.diagnostics.length || result.parsed.breaking !== value.draft.breaking) fail('response', 'Draft failed the shared message rules or breaking-change consistency.');
   return { ...value, message };
 }
+
+/** Canonical bytes for an eventual disclosure; validation never sends anything. */
+export function prepareDraftRequest(json, options) {
+  const prepared = JSON.stringify(validateDraftRequest(json, options));
+  if (Buffer.byteLength(prepared) > REQUEST_LIMIT) fail('request', 'Normalized request exceeds its byte allowance.');
+  return prepared;
+}
+
+/** Exercise one injected transport. No HTTP client, retry, fallback or Git action. */
+export async function runDraftProvider(json, transport, { signal, isCurrent, allowHunks = false, timeoutMs = DEADLINE_MS } = {}) {
+  if (typeof transport !== 'function') fail('transport', 'Expected an explicit transport function.');
+  if (typeof isCurrent !== 'function') fail('state', 'Expected a callback that checks the reviewed input and policy.');
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > DEADLINE_MS) fail('deadline', 'Use a positive deadline no longer than 30000 ms.');
+  const request = prepareDraftRequest(json, { allowHunks });
+  const allowedTypes = JSON.parse(request).policy.allowedTypes;
+  if (signal?.aborted) fail('cancelled', 'Draft waiting was cancelled. No retry was made.');
+  const controller = new AbortController();
+  let stopped;
+  let rejectInterrupted;
+  const interrupted = new Promise((_, reject) => { rejectInterrupted = reject; });
+  const failure = () => new DraftContractError(stopped, stopped === 'timeout'
+    ? 'Draft deadline elapsed. Processing may have started; no retry was made.'
+    : 'Draft waiting was cancelled. Processing may have started; no retry was made.');
+  const stop = code => {
+    if (stopped) return;
+    stopped = code;
+    controller.abort();
+    rejectInterrupted(failure());
+  };
+  const cancel = () => stop('cancelled');
+  signal?.addEventListener('abort', cancel, { once: true });
+  const timer = setTimeout(() => stop('timeout'), timeoutMs);
+  const check = () => { if (stopped) throw failure(); };
+  const current = async () => {
+    let matches;
+    try { matches = await isCurrent(); }
+    catch { fail('state', 'Cannot verify the reviewed input and policy.'); }
+    check();
+    if (matches !== true) fail('stale', 'The draft no longer matches the reviewed input or policy. Review again.');
+  };
+  const started = performance.now();
+  const work = (async () => {
+    await current();
+    check();
+    let raw;
+    try { raw = await transport(request, { signal: controller.signal }); }
+    catch { check(); fail('transport', 'The transport failed. Processing may have started; no retry was made.'); }
+    check();
+    await current();
+    const response = validateDraftResponse(raw, allowedTypes);
+    check();
+    return { response, measurements: { requestBytes: Buffer.byteLength(request), responseBytes: Buffer.byteLength(raw), elapsedMs: performance.now() - started } };
+  })();
+  try { return await Promise.race([work, interrupted]); }
+  finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
+}
