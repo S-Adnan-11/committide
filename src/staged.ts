@@ -34,7 +34,7 @@ async function identity(root: string): Promise<{ head: string | null; fingerprin
   return { head: base, fingerprint: createHash('sha256').update(base ?? 'unborn').update('\0').update(index.hash).digest('hex') };
 }
 
-const diffOptions = ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--no-relative',
+export const diffOptions = ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--no-relative',
   '--ignore-submodules=none', '--submodule=short', '--find-renames=50%', '-l1000'];
 
 function safePath(bytes: Buffer): string {

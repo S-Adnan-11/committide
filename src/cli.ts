@@ -12,7 +12,8 @@ import type { ChangelogOptions } from './changelog.js';
 import { join } from 'node:path';
 import { prepareChangelogFile } from './changelog-file.js';
 import { suggest } from './suggest.js';
-import { SuggestCancelled, terminalIO } from './suggest-io.js';
+import { CommitCancelled, SuggestCancelled, terminalIO } from './suggest-io.js';
+import { composeCommit } from './commit.js';
 import { helpBrand, terminalColors } from './brand.js';
 
 interface LintOptions { message?: string; file?: string }
@@ -128,6 +129,19 @@ program.command('suggest')
     } finally { io.close(); }
   });
 
+program.command('commit')
+  .description('Review an offline staged draft and explicitly confirm a normal Git commit')
+  .allowExcessArguments(false)
+  .addHelpText('after', '\nStage files with Git first. Type commit at the final prompt to approve; Enter does nothing.\nExisting Git hooks and signing run normally. Use suggest for a draft without committing.\n')
+  .action(async (_options: unknown, command: Command) => {
+    process.off('SIGINT', interrupt);
+    const io = terminalIO('commit');
+    try {
+      const result = await composeCommit(process.cwd(), command.optsWithGlobals<{ config?: string }>(), io);
+      process.exitCode = result.exitCode;
+    } finally { io.close(); }
+  });
+
 const hooks = program.command('hooks').description('Explicitly install or remove a repository-local commit-msg hook');
 for (const action of ['install', 'uninstall'] as const) {
   hooks.command(action).action(async (_options: unknown, command: Command) => {
@@ -162,7 +176,10 @@ try {
   if (process.argv.length === 2) program.help();
   await program.parseAsync();
 } catch (error) {
-  if (error instanceof SuggestCancelled) {
+  if (error instanceof CommitCancelled) {
+    process.stderr.write('Cancelled before Git commit.\n');
+    process.exitCode = 130;
+  } else if (error instanceof SuggestCancelled) {
     process.stderr.write('Cancelled; no message emitted.\n');
     process.exitCode = 130;
   } else if (error instanceof CommanderError) {
