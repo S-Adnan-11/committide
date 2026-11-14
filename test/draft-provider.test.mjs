@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateDraftRequest, validateDraftResponse, REQUEST_LIMIT, RESPONSE_LIMIT } from '../scripts/lib/draft-provider.mjs';
+import { validateDraftRequest, validateDraftResponse, prepareDraftRequest, runDraftProvider, REQUEST_LIMIT, RESPONSE_LIMIT } from '../scripts/lib/draft-provider.mjs';
 
 const request = () => ({ version: 1, policy: { allowedTypes: ['fix', 'docs'] },
   staged: { complete: true, entries: [{ status: 'M', path: 'src/parser.ts', kind: 'text', additions: 2, deletions: 1 }] },
@@ -117,4 +117,118 @@ test('response schema, policy, control characters and size cannot bypass message
 test('format validity does not assert semantic accuracy or usefulness', () => {
   const value = response(); value.draft.description = 'make the application infinitely fast';
   assert.equal(checkResponse(value).draft.description, value.draft.description);
+});
+
+const options = () => ({ isCurrent: () => true });
+
+test('one mock call receives only canonical validated bytes; result stays an unapproved draft', async () => {
+  const value = request(); value.policy.allowedTypes = ['FIX', 'docs', 'fix'];
+  const input = JSON.stringify(value, null, 2), prepared = prepareDraftRequest(input);
+  let calls = 0, checks = 0;
+  const result = await runDraftProvider(input, (bytes, { signal }) => {
+    calls++; assert.equal(bytes, prepared); assert.equal(typeof bytes, 'string'); assert.equal(signal.aborted, false);
+    assert.deepEqual(JSON.parse(bytes).policy.allowedTypes, ['fix', 'docs']);
+    assert.equal(JSON.parse(bytes).hunks, undefined);
+    return JSON.stringify(response());
+  }, { isCurrent: () => { checks++; return true; } });
+  assert.equal(calls, 1); assert.equal(checks, 2);
+  assert.equal(result.response.message, 'fix: handle empty input\n');
+  assert.equal(result.response.approved, undefined);
+  assert.equal(result.measurements.requestBytes, Buffer.byteLength(prepared));
+  assert.equal(result.measurements.responseBytes, Buffer.byteLength(JSON.stringify(response())));
+  assert.ok(result.measurements.elapsedMs >= 0);
+});
+
+test('invalid or undisclosed input and missing state checks cannot reach a transport', async () => {
+  let calls = 0; const transport = () => { calls++; return JSON.stringify(response()); };
+  await assert.rejects(runDraftProvider('{}', transport, options()), { code: 'request' });
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), transport), { code: 'state' });
+  const value = request(); value.hunks = [{ path: 'src/parser.ts', patch: '+fictional text\n' }];
+  await assert.rejects(runDraftProvider(JSON.stringify(value), transport, options()), { code: 'consent' });
+  assert.equal(calls, 0);
+});
+
+test('changed stage or policy before a call prevents it; drift after a call discards its draft', async () => {
+  for (const when of ['before', 'after']) {
+    let calls = 0, current = when !== 'before';
+    await assert.rejects(runDraftProvider(JSON.stringify(request()), () => {
+      calls++; current = false; return JSON.stringify(response());
+    }, { isCurrent: () => current }), { code: 'stale' });
+    assert.equal(calls, when === 'before' ? 0 : 1);
+  }
+});
+
+test('abort before invocation prevents any mock call', async () => {
+  const controller = new AbortController(); controller.abort('reason is never surfaced');
+  let calls = 0;
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), () => { calls++; }, { ...options(), signal: controller.signal }), { code: 'cancelled' });
+  assert.equal(calls, 0);
+});
+
+test('abort promptly rejects an uncooperative transport and its late response is ignored', async () => {
+  const controller = new AbortController(); let calls = 0, release, started;
+  const entered = new Promise(resolve => { started = resolve; });
+  const result = runDraftProvider(JSON.stringify(request()), (_json, { signal }) => {
+    calls++; started(signal); return new Promise(resolve => { release = resolve; });
+  }, { ...options(), signal: controller.signal });
+  const observed = await entered; controller.abort('private cancellation reason');
+  await assert.rejects(result, error => error.code === 'cancelled' && !error.message.includes('private cancellation reason'));
+  assert.equal(observed.aborted, true); release(JSON.stringify(response()));
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(calls, 1);
+});
+
+test('cancellation during the final state check cannot return an approved response', async () => {
+  const controller = new AbortController(); let checks = 0, finish, entered;
+  const checking = new Promise(resolve => { entered = resolve; });
+  const result = runDraftProvider(JSON.stringify(request()), () => JSON.stringify(response()), {
+    signal: controller.signal, isCurrent: () => { checks++; if (checks === 1) return true; entered(); return new Promise(resolve => { finish = resolve; }); },
+  });
+  await checking; controller.abort(); await assert.rejects(result, { code: 'cancelled' }); finish(true);
+});
+
+test('deadline bounds transport and state checks even when they ignore the abort signal', async () => {
+  let calls = 0, observed;
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), (_json, { signal }) => {
+    calls++; observed = signal; return new Promise(() => {});
+  }, { ...options(), timeoutMs: 10 }), { code: 'timeout' });
+  assert.equal(calls, 1); assert.equal(observed.aborted, true);
+  calls = 0;
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), () => { calls++; }, { timeoutMs: 10, isCurrent: () => new Promise(() => {}) }), { code: 'timeout' });
+  assert.equal(calls, 0);
+});
+
+test('transport failure is redacted and never causes a retry or provider fallback', async () => {
+  let calls = 0; const detail = 'fictional raw provider body';
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), () => { calls++; throw new Error(detail); }, options()),
+    error => error.code === 'transport' && !error.message.includes(detail));
+  assert.equal(calls, 1);
+});
+
+test('malformed or oversized mock responses cannot bypass the result contract', async () => {
+  for (const raw of ['{bad', '{}', ' '.repeat(RESPONSE_LIMIT + 1), { content: 'not JSON text' }]) {
+    let calls = 0;
+    await assert.rejects(runDraftProvider(JSON.stringify(request()), () => { calls++; return raw; }, options()), { code: 'response' });
+    assert.equal(calls, 1);
+  }
+});
+
+test('state-check failures and unsupported deadlines fail closed without exposing callback errors', async () => {
+  let calls = 0; const transport = () => { calls++; return JSON.stringify(response()); };
+  await assert.rejects(runDraftProvider(JSON.stringify(request()), transport, { isCurrent: () => { throw new Error('raw state details'); } }),
+    error => error.code === 'state' && !error.message.includes('raw state details'));
+  for (const timeoutMs of [0, -1, Infinity, 30_001]) {
+    await assert.rejects(runDraftProvider(JSON.stringify(request()), transport, { ...options(), timeoutMs }), { code: 'deadline' });
+  }
+  assert.equal(calls, 0);
+});
+
+test('mock interface never reads provider credentials or calls fetch', async () => {
+  const original = globalThis.fetch, previous = process.env.GROQ_API_KEY;
+  globalThis.fetch = () => { assert.fail('Unexpected network'); }; process.env.GROQ_API_KEY = 'synthetic-unused';
+  try {
+    const result = await runDraftProvider(JSON.stringify(request()), () => JSON.stringify(response()), options());
+    assert.equal(result.response.draft.type, 'fix');
+  } finally {
+    globalThis.fetch = original; if (previous === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = previous;
+  }
 });
