@@ -17,7 +17,7 @@ interface Binding {
   branch: string | null;
   allowed: string[];
 }
-export interface StagedChange { status: string; paths: string[]; sameMode: boolean }
+export interface StagedChange { status: string; paths: string[]; sameMode: boolean; kind: 'text' | 'symlink' | 'submodule' }
 export interface CommitState extends Binding {
   changes: StagedChange[];
   additions: number;
@@ -93,7 +93,9 @@ function changes(bytes: Buffer): StagedChange[] {
     const paths = [fields[i++]!];
     if (/^[RC]/.test(record[3]!)) paths.push(fields[i++]!);
     if (paths.some(path => !path)) throw new OperationalError('commit-index', 'Incomplete staged diff. Use Git directly.');
-    result.push({ status: record[3]!, paths, sameMode: record[1] === record[2] });
+    const modes = [record[1], record[2]];
+    const kind = modes.includes('160000') ? 'submodule' : modes.includes('120000') ? 'symlink' : 'text';
+    result.push({ status: record[3]!, paths, sameMode: record[1] === record[2], kind });
   }
   return result;
 }
