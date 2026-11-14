@@ -232,3 +232,14 @@ test('mock interface never reads provider credentials or calls fetch', async () 
     globalThis.fetch = original; if (previous === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = previous;
   }
 });
+
+
+test('local instruction paths stay excluded from context and renamed vendor paths cannot carry hunks', () => {
+  for (const path of ['AGENTS.md', 'docs/AGENTS.override.md', '.codex/settings.toml', '.agents/memory.md']) {
+    const value = request(); value.staged.entries[0].path = path;
+    rejects(() => checkRequest(value), 'sensitive');
+  }
+  const value = request(); Object.assign(value.staged.entries[0], { status: 'R', previousPath: 'vendor/parser.ts' });
+  value.hunks = [{ path: 'src/parser.ts', patch: '+fictional content\n' }];
+  rejects(() => validateDraftRequest(JSON.stringify(value), { allowHunks: true }), 'request');
+});

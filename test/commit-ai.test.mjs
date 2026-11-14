@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, realpathSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, readFileSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
@@ -185,3 +185,13 @@ test('a structurally shaped reply cannot bypass message lint or attach executabl
     assert.equal(mock.count(), 1); assert.equal(head(cwd), '');
   }
 }));
+
+
+test('a renamed vendor entry remains metadata-only and cannot expose its old staged content', async () => {
+  const cwd = fixture(); mkdirSync(join(cwd, 'vendor'));
+  change(cwd, env, 'vendor/old.txt', 'fictional vendor content\n'); commit(cwd, env, 'chore: base');
+  git(cwd, env, ['mv', 'vendor/old.txt', 'new.txt']);
+  const state = await captureCommitState(cwd), data = JSON.parse(await commitContext(cwd, state, ''));
+  assert.equal(data.staged.entries[0].previousPath, 'vendor/old.txt');
+  await assert.rejects(commitContext(cwd, state, '', [0]), { code: 'request' });
+});

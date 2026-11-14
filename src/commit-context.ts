@@ -43,7 +43,7 @@ export async function commitContext(cwd: string, state: CommitState, intent: str
     for (const index of selected) {
       const entry = entries[index];
       if (!Number.isInteger(index) || !entry || entry.kind !== 'text') throw new DraftContractError('request', 'Select staged text entries by their displayed number.');
-      if (/(?:^|\/)(?:node_modules|vendor|dist|build|coverage)(?:\/|$)/i.test(entry.path)) throw new DraftContractError('request', 'Generated/vendor patches are excluded. Use metadata or offline drafting.');
+      if ([entry.path, entry.previousPath].some(path => path !== undefined && /(?:^|\/)(?:node_modules|vendor|dist|build|coverage)(?:\/|$)/i.test(path))) throw new DraftContractError('request', 'Generated/vendor patches are excluded. Use metadata or offline drafting.');
       const paths = entry.previousPath ? [entry.previousPath, entry.path] : [entry.path];
       const patch = await gitPrefix(state.snapshot.root, ['--literal-pathspecs', ...diffOptions, '--patch', '--full-index', '--unified=3',
         '--src-prefix=a/', '--dst-prefix=b/', ...base, '--', ...paths], REQUEST_LIMIT);

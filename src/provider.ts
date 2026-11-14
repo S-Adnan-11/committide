@@ -53,7 +53,7 @@ function path(value: unknown): value is string {
     && !secretLike(value);
 }
 function sensitivePath(value: string) {
-  return /(?:^|\/)(?:\.git|\.ssh|\.aws|\.env(?:\.[^/]*)?|\.npmrc|\.netrc|(?:credentials|secrets?)(?:\.[^/]*)?|id_(?:rsa|ed25519)|[^/]+\.(?:pem|p12|pfx|key))(?:\/|$)/i.test(value);
+  return /(?:^|\/)(?:\.git|\.ssh|\.aws|\.codex|\.agents|AGENTS(?:\.override)?\.md|\.env(?:\.[^/]*)?|\.npmrc|\.netrc|(?:credentials|secrets?)(?:\.[^/]*)?|id_(?:rsa|ed25519)|[^/]+\.(?:pem|p12|pfx|key))(?:\/|$)/i.test(value);
 }
 
 /** Strict, bounded staged-only DTO. Callers must establish provenance and consent. */
@@ -85,7 +85,7 @@ export function validateDraftRequest(json: string, { allowHunks = false }: { all
     for (const hunk of value.hunks) {
       const entry = value.staged.entries.find(entry => entry.path === hunk?.path);
       if (!shape(hunk, ['path', 'patch']) || !entry || entry.kind !== 'text' || !text(hunk.patch, REQUEST_LIMIT, true)
-        || !hunk.patch.trim() || /(?:^|\/)(?:node_modules|vendor|dist|build|coverage)(?:\/|$)/i.test(hunk.path)) {
+        || !hunk.patch.trim() || [entry.path, entry.previousPath].some(value => value !== undefined && /(?:^|\/)(?:node_modules|vendor|dist|build|coverage)(?:\/|$)/i.test(value))) {
         fail('request', 'Selected hunks must belong to staged text entries outside generated/vendor paths.');
       }
       if (secretLike(hunk.patch)) fail('sensitive', 'Credential-like input is blocked. Review the context locally.');
