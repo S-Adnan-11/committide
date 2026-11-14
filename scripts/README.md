@@ -1,0 +1,35 @@
+# Development checks
+
+Build the CLI before running the provider contract tests:
+
+```sh
+npm run build
+node --test test/draft-provider.test.mjs
+```
+
+`lib/draft-provider.mjs` defines a versioned JSON boundary for mock draft
+providers. It reuses the message assembler, type configuration and linter from
+the build. It is development tooling, excluded from the npm package, and adds
+no CLI option, HTTP client or provider credential handling.
+
+Requests carry `{version:1, policy:{allowedTypes}, staged:{complete,entries},
+intent}`. Each entry has a status (`A`, `M`, `D`, `R` or `T`), relative `path`,
+`kind` (`text`, `binary`, `submodule` or `symlink`), `additions` and `deletions`.
+Renames also require `previousPath`. Non-text counts are `null`. Unknown fields,
+incomplete/empty metadata, duplicate paths, unsafe paths and credential-like
+content refuse. The whole JSON request is bounded to 16 KiB of UTF-8.
+
+Metadata is the default. Optional `hunks:[{path,patch}]` require a separate
+`allowHunks:true` choice, must name staged text entries and exclude generated or
+vendor paths. Callers must prove the input came from the reviewed index and
+show the actual payload before any future remote use. Schema validation and
+secret screening cannot establish provenance or prove that content is safe.
+
+Responses carry `{version:1,draft,uncertainty}`. The draft has `type`, `scope`,
+`description`, `body`, `breaking`, `breakingDetails`, `refs` and `footers`.
+Unknown fields, unsafe controls, inconsistent breaking details and failed shared
+message validation refuse. The response is bounded to 32 KiB of UTF-8. A valid
+format says nothing about factual accuracy or whether the draft is useful.
+
+These byte limits are local bounds, not token counts or provider entitlements.
+All contract tests use fictional content; they do not measure model quality.
