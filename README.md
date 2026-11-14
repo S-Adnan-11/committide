@@ -431,6 +431,16 @@ The existing check-to-execution interval and independent Git/hook behavior still
 apply. `suggest --ai` retains its existing staged-patch disclosure and draft-only
 behavior.
 
+
+### Hosted draft preview (source build)
+
+After building this checkout, use `node dist/cli.js commit --hosted` to select the anonymous hosted draft flow. It is an offline proof with a reserved `.invalid` endpoint; no service is deployed. It is not available from the published 0.1.0 package. Contributor checks use a fake Worker inference binding without an account, API key or model download.
+
+The preview displays the destination and exact versioned JSON body before a separate `send` choice. Only bounded staged paths/status/kinds/counts, allowed commit types and an optional intent hint are eligible. It sends no patches, repository upload, credentials, custom prompt or model choice. Paths and intent can still be sensitive. The server adds fixed instructions and uses one allowlisted model. Application payload logging is disabled; platform data handling needs verification before rollout.
+
+`commit --ai` still selects Groq, including its existing credential and optional-patch choices. Plain `commit` stays offline. Choose one drafting flag at a time. Quota, service errors and invalid replies return to offline composition without a retry or provider switch. Ctrl+C cancels the command; rerunning plain `commit` remains available. A reply still needs normal editing/review, stale-state checks and explicit final `commit` confirmation. The [Worker implementation](worker/README.md) stays outside the npm package.
+
+
 ## Write a commit message
 
 ```sh

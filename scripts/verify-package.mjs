@@ -8,6 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import { interact } from '../test/terminal-helpers.mjs';
 import { verifyHelpBranding } from '../test/brand-helpers.mjs';
 import { verifyCommitAI } from '../test/commit-ai-package.mjs';
+import { verifyHosted } from '../test/hosted-package.mjs';
 
 // Run via npm so the same npm installation is available across Windows and POSIX.
 assert.ok(process.env.npm_execpath, 'Run npm run verify:package');
@@ -66,6 +67,8 @@ try {
   verifyHelpBranding(installedCli, destination);
   const aiChecks = await verifyCommitAI(installedCli, scratch);
   assert.equal(aiChecks.length, 10);
+  const hostedChecks = await verifyHosted(installedCli, scratch);
+  assert.equal(hostedChecks.length, 16);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--output/);
   assert.match(execute(process.execPath, [installedCli, 'suggest', '--help'], destination).stdout, /--ai/);
   assert.match(execute(process.execPath, [installedCli, 'suggest'], destination, 2).stderr, /suggest-terminal/);
@@ -203,7 +206,7 @@ try {
     execute(shim, ['lint', '--message', 'feat: installed shim'], destination);
     execute(shim, ['lint', '--message', 'invalid'], destination, 1);
   }
-  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/changelog/suggest/commit/AI-consent/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
+  console.log(`PASS: inspected ${entries.size} archive entries, installed outside source, verified lint/history/hooks/changelog/suggest/commit/AI-consent/hosted-fake-inference/exit codes and npm executable shim on ${process.platform} ${process.version}.`);
   console.log(`Archive: ${packed.filename}; integrity: ${packed.integrity}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });

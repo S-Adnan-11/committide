@@ -7,17 +7,20 @@ import { CommitCancelled } from './suggest-io.js';
 import { OperationalError } from './errors.js';
 import { executeCommit } from './commit-run.js';
 import { offerCommitDraft } from './commit-ai.js';
+import { offerHostedDraft } from './hosted.js';
 import type { CommitAiDependencies } from './commit-ai.js';
 import type { CommitIO, CommitResult } from './commit-run.js';
 
-export async function composeCommit(cwd: string, options: { config?: string; ai?: boolean }, io: CommitIO, dependencies: CommitAiDependencies = {}): Promise<CommitResult> {
+export async function composeCommit(cwd: string, options: { config?: string; ai?: boolean; hosted?: boolean }, io: CommitIO, dependencies: CommitAiDependencies = {}): Promise<CommitResult> {
+  if (options.ai && options.hosted) throw new OperationalError('commit-provider', 'Choose either --ai (Groq) or --hosted.');
+  const draftChoice = options.hosted ? 'hosted' : options.ai ? 'ai' : '';
   let state = await captureCommitState(cwd, options.config);
   io.review(commitOverview(state));
   if (!state.changes.length) {
     io.review('Nothing staged. Stage the changes you want to commit, then run commit again.\n');
     return { status: 'empty', exitCode: 0 };
   }
-  io.review((options.ai ? 'AI drafting requires a separate disclosure/send choice. ' : 'Offline composition. ')
+  io.review((draftChoice ? 'AI drafting requires a separate disclosure/send choice. ' : 'Offline composition. ')
     + 'Git and existing hooks/signing retain normal behavior. Type /cancel at any prompt to stop.\n');
   const ask = async (prompt: string) => {
     io.check();
@@ -62,7 +65,7 @@ export async function composeCommit(cwd: string, options: { config?: string; ai?
     await compose();
   };
   const ai = async (initial = false) => {
-    const result = await offerCommitDraft(cwd, state, options.config, io, dependencies);
+    const result = await (options.hosted ? offerHostedDraft : offerCommitDraft)(cwd, state, options.config, io, dependencies);
     if (result.kind === 'draft') draft = result.draft;
     else if (result.kind === 'stale') await refresh();
     else if (initial) await compose(result.hint);
@@ -73,7 +76,7 @@ export async function composeCommit(cwd: string, options: { config?: string; ai?
     if (action === 'cancel') throw new CommitCancelled();
     if (action === 'continue') {
       if (!await commitStateCurrent(cwd, state, options.config)) { await refresh(); break; }
-      if (options.ai) await ai(true); else await compose(); break;
+      if (draftChoice) await ai(true); else await compose(); break;
     }
     if (action === 'patch') {
       const patch = await stagedPatch(state.snapshot);
@@ -91,14 +94,14 @@ export async function composeCommit(cwd: string, options: { config?: string; ai?
     io.review(`\nDraft for this repository, branch, HEAD, index and type policy:\n---\n${message.split('\n').map(terminalText).join('\n')}---\n`);
     for (const diagnostic of result.diagnostics) io.review(`error [${diagnostic.rule}] line ${diagnostic.line}: ${terminalText(diagnostic.message)}\n`);
     io.review('Check the full message and staged changes. Only the word commit below approves invoking Git; Enter alone does nothing.\n');
-    const action = (await ask(`Review: commit / edit / patch / refresh${options.ai ? ' / ai' : ''} / cancel: `)).trim().toLowerCase();
+    const action = (await ask(`Review: commit / edit / patch / refresh${draftChoice ? ' / ' + draftChoice : ''} / cancel: `)).trim().toLowerCase();
     if (action === 'cancel') throw new CommitCancelled();
     if (action === 'edit') {
       await editor().edit((await ask('Field: type / scope / description / body / breaking / refs / footers: ')).trim().toLowerCase());
     } else if (action === 'patch') {
       const patch = await stagedPatch(state.snapshot);
       if (patch === null || !await commitStateCurrent(cwd, state, options.config)) await refresh(); else io.review(patch);
-    } else if (action === 'ai' && options.ai) {
+    } else if (action === draftChoice && draftChoice) {
       await ai();
     } else if (action === 'refresh') {
       await refresh();
@@ -109,6 +112,6 @@ export async function composeCommit(cwd: string, options: { config?: string; ai?
       const recorded = await executeCommit(cwd, state, message, io, options.config);
       if (recorded.status === 'stale') { await refresh(); continue; }
       return recorded;
-    } else io.review(`Choose commit, edit, patch, refresh${options.ai ? ', ai' : ''}, or cancel.\n`);
+    } else io.review(`Choose commit, edit, patch, refresh${draftChoice ? ', ' + draftChoice : ''}, or cancel.\n`);
   }
 }

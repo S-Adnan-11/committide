@@ -15,7 +15,8 @@ export class Admission {
     if (this.env.HOSTED_ENABLED !== 'true' || !configuredCap(this.env.ADMISSION_CAP)) return reply(503, 'disabled');
     try {
       const admitted = await this.storage.transaction(async txn => {
-        const used = await txn.get('admitted') ?? 0;
+        const stored = await txn.get('admitted');
+        const used = stored === undefined ? 0 : stored;
         if (!Number.isSafeInteger(used) || used < 0) throw new Error('Invalid counter');
         if (used >= configuredCap(this.env.ADMISSION_CAP)) return false;
         await txn.put('admitted', used + 1);

@@ -115,8 +115,10 @@ test('burst and admission storage errors fail closed', async () => {
   assert.equal((await worker.fetch(wireRequest(), f.env)).status, 503); assert.equal(f.calls.length, 0);
   const g = fakeEnvironment(); g.storage.transaction = async () => { throw new Error('private'); };
   assert.equal((await worker.fetch(wireRequest(), g.env)).status, 503); assert.equal(g.calls.length, 0);
-  const h = fakeEnvironment(); h.storage.values.set('admitted', NaN);
-  assert.equal((await worker.fetch(wireRequest(), h.env)).status, 503); assert.equal(h.calls.length, 0);
+  for (const invalid of [NaN, null, -1, '0']) {
+    const h = fakeEnvironment(); h.storage.values.set('admitted', invalid);
+    assert.equal((await worker.fetch(wireRequest(), h.env)).status, 503); assert.equal(h.calls.length, 0);
+  }
 });
 test('kill switch checked again after admission, and counter object also enforces it', async () => {
   const f = fakeEnvironment();
