@@ -132,13 +132,14 @@ program.command('suggest')
 program.command('commit')
   .description('Review an offline staged draft and explicitly confirm a normal Git commit')
   .option('--ai', 'offer a separately disclosed Groq draft; metadata by default, optional selected patches')
+  .option('--hosted', 'offer the anonymous metadata-only hosted preview (offline proof; no service deployed)')
   .allowExcessArguments(false)
   .addHelpText('after', '\nStage files with Git first. Type commit at the final prompt to approve; Enter does nothing.\nExisting Git hooks and signing run normally. Use suggest for a draft without committing.\n')
   .action(async (_options: unknown, command: Command) => {
     process.off('SIGINT', interrupt);
     const io = terminalIO('commit');
     try {
-      const result = await composeCommit(process.cwd(), command.optsWithGlobals<{ config?: string; ai?: boolean }>(), io);
+      const result = await composeCommit(process.cwd(), command.optsWithGlobals<{ config?: string; ai?: boolean; hosted?: boolean }>(), io);
       process.exitCode = result.exitCode;
     } finally { io.close(); }
   });
