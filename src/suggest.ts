@@ -8,23 +8,11 @@ import type { SuggestIO } from './suggest-io.js';
 import { OperationalError } from './errors.js';
 import { prepareGroq, requestGroq, GROQ_MODEL, REQUEST_LIMIT, COMPLETION_LIMIT } from './groq.js';
 
-export interface Draft {
-  type: string; scope: string; description: string; body: string;
-  breaking: boolean; breakingDetails: string; refs: string; footers: string;
-}
+import { assembleDraft, draftEditor } from './draft.js';
+import type { Draft } from './draft.js';
+export { assembleDraft } from './draft.js';
+export type { Draft } from './draft.js';
 
-export function assembleDraft(draft: Draft): string {
-  const header = `${draft.type.toLowerCase()}${draft.scope ? `(${draft.scope})` : ''}${draft.breaking ? '!' : ''}: ${draft.description}`;
-  const footers = [draft.breaking ? `BREAKING CHANGE: ${draft.breakingDetails}` : '', draft.refs ? `Refs: ${draft.refs}` : '', draft.footers].filter(Boolean).join('\n');
-  return [header, draft.body, footers].filter(Boolean).join('\n\n') + '\n';
-}
-
-const meanings: Readonly<Record<string, string>> = {
-  feat: 'new functionality, e.g. add search', fix: 'correct a bug, e.g. handle empty results',
-  docs: 'documentation', style: 'formatting without behavior changes', refactor: 'restructure without changing behavior',
-  perf: 'performance improvement', test: 'tests', build: 'build system or dependencies', ci: 'continuous integration',
-  chore: 'maintenance', revert: 'reverse an earlier change',
-};
 const shown = (text: string) => text.split('\n').map(terminalText).join('\n');
 
 export async function suggest(cwd: string, options: { config?: string; output?: string; ai?: boolean }, io: SuggestIO): Promise<string | null> {
@@ -57,28 +45,7 @@ export async function suggest(cwd: string, options: { config?: string; output?: 
     }
   };
   const draft: Draft = { type: '', scope: '', description: '', body: '', breaking: false, breakingDetails: '', refs: '', footers: '' };
-  const type = async () => {
-    io.review('Choose a configured type:\n' + allowed.map(value => `  ${terminalText(value)}: ${Object.hasOwn(meanings, value) ? meanings[value] : 'custom configured type'}`).join('\n') + '\n');
-    draft.type = (await ask('Type (e.g. feat): ')).trim().toLowerCase();
-  };
-  const edit = async (field: string) => {
-    switch (field) {
-      case 'type': await type(); break;
-      case 'scope': draft.scope = await ask('Scope (optional, e.g. api; blank clears): '); break;
-      case 'description': draft.description = await ask('Description (required, e.g. handle empty search results): '); break;
-      case 'body': draft.body = await multiline('Body (optional context and reasoning)'); break;
-      case 'breaking': {
-        const answer = (await ask('Deliberately mark a breaking change? yes/no: ')).trim().toLowerCase();
-        if (!['yes', 'no'].includes(answer)) { io.review('Enter yes or no; breaking selection unchanged.\n'); break; }
-        draft.breaking = answer === 'yes';
-        if (draft.breaking) draft.breakingDetails = await multiline('Breaking details (explain the required migration)');
-        break;
-      }
-      case 'refs': draft.refs = await multiline('Issue references (optional, e.g. #123; emitted as neutral Refs, never automatic closing)'); break;
-      case 'footers': draft.footers = await multiline('Other footers (optional, e.g. Reviewed-by: Name)'); break;
-      default: io.review('Choose type, scope, description, body, breaking, refs, or footers.\n');
-    }
-  };
+  const { type, edit } = draftEditor(draft, () => allowed, ask, text => io.review(text), multiline);
   const refresh = async () => {
     io.review('The index or HEAD changed. Your draft is retained; the previous staged review is stale.\n');
     const answer = await ask('Refresh the staged review, or cancel? refresh/cancel: ');

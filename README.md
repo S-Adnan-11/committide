@@ -30,7 +30,7 @@ Usage: committide [options] [command]
 CommitTide validates Conventional Commits messages, checks Git history, helps
 compose messages from staged changes, and generates release notes.
 
-[`lint`](#message-format) · [`suggest`](#write-a-commit-message) · [`check`](#check-git-history) · [`changelog`](#release-notes)
+[`lint`](#message-format) · [`suggest`](#write-a-commit-message) · [`commit` (source preview)](#review-and-commit-source-preview) · [`check`](#check-git-history) · [`changelog`](#release-notes)
 
 ## Install
 
@@ -325,6 +325,69 @@ Git operations that do not invoke commit-msg
 cannot be enforced by this hook. Local hooks are bypassable with `--no-verify`;
 run range checking in CI for an additional enforcement boundary. Passing format
 checks still does not establish whether a message accurately describes changes.
+
+## Review and commit (source preview)
+
+`committide commit` is available in this source branch. The published `0.1.0`
+package still has the draft-only `suggest` workflow. Build this checkout with
+`npm ci` and `npm run build`, then run its compiled entry in a terminal:
+
+```sh
+git add README.md
+node dist/cli.js commit
+```
+
+The review shows the repository, branch (or detached HEAD), base commit, staged
+paths/status and line counts. Choose `patch` to see a bounded staged patch, or
+`continue` to compose. Simple documentation, test and content-preserving rename
+changes get a small editable draft. Other changes ask for a configured type,
+optional scope and your intent. A mixed-file hint asks you to consider the change
+as a whole. Type configuration works just as it does for `suggest`.
+
+At the final `commit / edit / patch / refresh / cancel` prompt, type `commit` to
+approve. Enter alone keeps you in review. `edit` opens the shared field editor,
+including multiline body, breaking details, references and trailers. Use
+`.done` to finish a multiline field. Check the whole message before confirming.
+`cancel`, `/cancel`, EOF or Ctrl+C before handoff exits 130 without invoking Git.
+An invalid draft stays in review until corrected or cancelled. Nothing staged
+is a successful no-op; usage/configuration/inspection failures exit 2.
+
+Approval covers this worktree, branch/ref, HEAD or unborn state, staged contents
+and effective type policy. A changed state discards the draft and confirmation,
+shows the current staged set and requires a fresh decision. There is still a
+check-to-execution interval: other Git processes and hooks are independent
+writers. Avoid concurrent repository changes during review; this is not an
+atomic lock across arbitrary Git activity.
+
+After confirmation, CommitTide creates an exclusive UTF-8 message in a private
+temporary directory and runs `git commit --file <message-path>` with inherited
+terminal streams. Git hooks, configured signing, authorship and cleanup run
+normally. CommitTide itself makes no network request in this path; hooks and
+signing tools retain their own behavior. Git output goes to its normal streams;
+the recorded HEAD and message are also reported on stderr, including message
+changes made by hooks. A child failure propagates Git's exit code. An unexpected
+or unreadable result exits nonzero (2 if Git reported success) and asks you to
+inspect `git status` and `git log`. No commit is retried or rolled back.
+
+Temporary messages use directory/file modes 0700/0600 on POSIX. Windows uses
+the current OS user's profile temp directory and a protected ACL for that user;
+`whoami.exe` and `icacls.exe` must be available. Normal and handled error paths
+remove the file and directory. Forced termination or power loss can leave a
+`committide-commit-*` directory in user temp for manual inspection.
+
+Ordinary initial commits, linked worktrees, detached HEAD and partially staged
+files are supported. Conflicts and active merge/rebase/cherry-pick/revert or
+sequencer operations require Git's native continuation. Review is limited to
+100 staged entries and an 8 MiB expanded index listing; intent-to-add entries,
+alternate-index/repository environment overrides and unsupported index records
+refuse with guidance. There is no Git option/pathspec forwarding: stage with Git
+first. Use Git directly for amend, fixup, allow-empty and operation continuation.
+
+For a message without committing, keep using:
+
+```sh
+node dist/cli.js suggest --output commit-message.txt
+```
 
 ## Write a commit message
 
