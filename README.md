@@ -389,6 +389,48 @@ For a message without committing, keep using:
 node dist/cli.js suggest --output commit-message.txt
 ```
 
+### Optional Groq draft for the composer (source preview)
+
+```sh
+node dist/cli.js commit --ai
+```
+
+The published `0.1.0` package does not include this command. `commit` stays
+entirely offline by default. With `--ai`, the composer offers Groq and the
+existing `openai/gpt-oss-20b` model. Metadata is the default context: staged
+paths, status, object kind, line counts, configured types and an optional intent
+hint. No patch text is selected by viewing the local patch.
+
+Choose `hunks` separately to select staged text entries by number. This includes
+all hunks and context lines for each selected file, including both paths for a
+rename. Binary, symlink, submodule and generated/vendor patches are excluded.
+Sensitive paths and credential-like content refuse; screening cannot prove
+safety. No unstaged/untracked content, repository root, branch, author or remote
+is added to the request. Filenames and your hint can still be sensitive.
+
+Before sending, review the fixed destination and complete outgoing JSON body,
+including the context, instructions and response schema. Only `send` at the
+separate Groq prompt invokes the adapter. `local` or Enter keeps drafting
+offline. Missing credentials, unavailable/invalid responses and deadlines offer
+offline continuation. Another request requires a deliberate `ai` and `send`
+choice; there is no automatic retry or provider switch. Credential setup and
+[data handling](https://console.groq.com/docs/your-data) are described below.
+
+The existing Groq adapter bounds the whole serialized request to 5500 UTF-8
+bytes, the response to 32768 bytes, completion to1536 tokens including reasoning,
+and waiting to30 seconds. Oversized selected context is refused rather than
+silently truncated. Bytes are not billed token counts or a free quota guarantee.
+Ctrl+C cancels waiting; it cannot guarantee remote processing stops.
+
+A valid returned draft enters the ordinary edit/review screen. Format validity
+is not evidence of accuracy. Changed worktree, branch, HEAD, staged contents or
+effective type policy discards the draft and requires fresh review; a refresh
+never sends another request automatically. Only the final `commit` choice can
+invoke normal Git. Provider text cannot run commands, change hooks, stage or push.
+The existing check-to-execution interval and independent Git/hook behavior still
+apply. `suggest --ai` retains its existing staged-patch disclosure and draft-only
+behavior.
+
 ## Write a commit message
 
 ```sh

@@ -347,7 +347,7 @@ test('cancellation during the last check cleans temporary content and invokes no
 
 test('CLI refuses headless input, unknown options, pathspecs and Git passthrough; help works anywhere', () => {
   assert.match(invoke(root, env, ['commit', '--help']).stdout, /Only|Enter does nothing/);
-  for (const args of [[], ['--ai'], ['-m', 'docs: supplied'], ['--amend'], ['--no-verify'], ['file.txt'], ['--', 'file.txt']]) {
+  for (const args of [[], ['--provider'], ['-m', 'docs: supplied'], ['--amend'], ['--no-verify'], ['file.txt'], ['--', 'file.txt']]) {
     const result = run(process.execPath, [cli, 'commit', ...args], root, env, 2, 'commit\n');
     assert.equal(result.stdout, '');
     assert.match(result.stderr, args.length ? /unknown option|too many arguments/ : /commit-terminal/);
