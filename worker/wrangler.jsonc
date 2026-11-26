@@ -1,6 +1,6 @@
 {
   "name": "committide-draft-preview",
-  "main": "index.mjs",
+  "main": "entry.mjs",
   "compatibility_date": "2026-11-14",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
