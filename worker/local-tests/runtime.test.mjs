@@ -47,13 +47,13 @@ async function fixture(t) {
   await build({ entryPoints: [join(root, 'worker', configuration.main)], bundle: true, format: 'esm',
     platform: 'neutral', external: ['node:*'], outfile: bundle, logLevel: 'silent' });
   await writeFile(join(directory, 'fake.mjs'), fakeBindings);
-  return { directory, bundle };
+  return { directory, bundle, configuration };
 }
 
 async function start(f, { cap = '4', enabled = 'true', model = models[0], mode = 'success' } = {}) {
   const calls = [], blocked = [];
   const deny = async request => { blocked.push(new URL(request.url).hostname); return new LocalResponse('Outbound network blocked', { status: 503 }); };
-  const shared = { rootPath: f.directory, modulesRoot: f.directory, modules: true, compatibilityDate: '2026-07-30', compatibilityFlags: ['nodejs_compat'], outboundService: deny };
+  const shared = { rootPath: f.directory, modulesRoot: f.directory, modules: true, compatibilityDate: f.configuration.compatibility_date, compatibilityFlags: ['nodejs_compat'], outboundService: deny };
   const front = name => ({ ...shared, name, scriptPath: f.bundle,
     bindings: { HOSTED_ENABLED: enabled, ADMISSION_CAP: cap, MODEL: model },
     durableObjects: { ADMISSION: { className: 'Admission', scriptName: 'draft-a', useSQLite: true } },
