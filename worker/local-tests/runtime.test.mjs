@@ -66,7 +66,7 @@ async function start(f, { cap = '4', enabled = 'true', model = models[0], mode =
       } } }] });
   try { await mf.ready; } catch (error) { await mf.dispose(); throw error; }
   const a = await mf.getWorker('draft-a'), b = await mf.getWorker('draft-b');
-  return { mf, calls, blocked, send: (which = 0) => (which ? b : a).fetch('https://draft.invalid/v1/draft', request()) };
+  return { mf, calls, blocked, status: () => a.fetch('https://draft.invalid/v1/status'), send: (which = 0) => (which ? b : a).fetch('https://draft.invalid/v1/draft', request()) };
 }
 async function sqliteFiles(directory) {
   const files = [];
@@ -154,5 +154,25 @@ test('fake burst refusal does not consume persistent admission', async t => {
   finally { await local.mf.dispose(); }
   local = await start(f, { cap: '1' });
   try { assert.equal((await local.send()).status, 200); assert.equal(local.calls.length, 1); }
+  finally { await local.mf.dispose(); }
+});
+
+
+test('readiness reports the same persisted counter without admission or inference, including when disabled', async t => {
+  const f = await fixture(t); let local = await start(f, { enabled: 'false' });
+  try {
+    const reply = await local.status(); assert.equal(reply.status, 200);
+    assert.equal(reply.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await reply.json(), { version: 1, admittedCount: 0 }); assert.equal(local.calls.length, 0);
+  } finally { await local.mf.dispose(); }
+  local = await start(f);
+  try {
+    assert.deepEqual(await (await local.status()).json(), { version: 1, admittedCount: 0 });
+    assert.equal((await local.send()).status, 200);
+    for (let i = 0; i < 3; i++) assert.deepEqual(await (await local.status()).json(), { version: 1, admittedCount: 1 });
+    assert.equal(local.calls.length, 1); assert.deepEqual(local.blocked, []);
+  } finally { await local.mf.dispose(); }
+  local = await start(f, { enabled: 'false' });
+  try { assert.deepEqual(await (await local.status()).json(), { version: 1, admittedCount: 1 }); assert.equal(local.calls.length, 0); }
   finally { await local.mf.dispose(); }
 });
