@@ -1,0 +1,38 @@
+name: Verify Worker runtime
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', 'src/**', 'package*.json', 'tsconfig.json', '.github/workflows/verify-worker.yml']
+  pull_request:
+    paths: ['worker/**', 'src/**', 'package*.json', 'tsconfig.json', '.github/workflows/verify-worker.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    if: ${{ github.event.repository.private == false }}
+    name: ${{ matrix.os }} / local SQLite
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci --prefix worker/local-tests
+      - run: npm test --prefix worker/local-tests

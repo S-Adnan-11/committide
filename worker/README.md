@@ -1,6 +1,6 @@
 # Draft endpoint
 
-Offline implementation of `POST /v1/draft`. No service is deployed. The client uses a reserved `.invalid` destination until a separately reviewed service configuration exists. Tests inject inference; no Cloudflare account, key or model download is needed. Build the shared modules with `npm run build`, then run `node --test test/hosted-worker.test.mjs`. The Worker and its configuration stay outside the npm archive.
+Offline implementation of `POST /v1/draft`. No service is deployed. The client uses a reserved `.invalid` destination until a separately reviewed service configuration exists. Tests inject inference; no Cloudflare account, key or model download is needed. The deployment entry module exports only the handler and Admission class; helper constants stay internal. `GET /v1/status` returns only `{version:1,admittedCount}` with no caching, admission, inference or storage write; it remains readable while drafting is disabled. This is readiness metadata, not remote source/model identity verification. Build the shared modules with `npm run build`, then run `node --test test/hosted-worker.test.mjs`. The Worker and its configuration stay outside the npm archive.
 
 Only bounded version 1 staged metadata, type policy and optional intent are accepted. Unknown fields, hunks, prompts, models, credentials and uploads are rejected. Paths and intent remain untrusted data in a fixed server prompt. Screening cannot establish that input is safe or truthful. Output must satisfy both wire bounds and shared commit validation.
 
@@ -10,6 +10,6 @@ The edge burst binding allows 3 requests/minute per edge-supplied IP and is appr
 
 The application logs no payloads, prompts, IPs or model replies and disables Worker observability in its sample configuration. The only stored value is a global admission count. Platform data handling and operational logging still need verification before any service rollout. There is no client API token. No account setup or deployment runs in contributor checks.
 
-The schema and fixed prompt are versioned with this endpoint. A model/data-handling/destination change needs renewed disclosure. Real Worker runtime behavior, account Free limits, model reply shape/quality and abuse handling remain rollout work.
+The schema and fixed prompt are versioned with this endpoint. A model/data-handling/destination change needs renewed disclosure. Local workerd/SQLite checks are available in [local-tests](local-tests/README.md). Account Free limits, deployed runtime/edge behavior, model reply shape/quality and abuse handling remain rollout work.
 
 References: [atomic storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#transaction), [approximate edge limits](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/), [GLM](https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/), [Granite](https://developers.cloudflare.com/workers-ai/models/granite-4.0-h-micro/).
